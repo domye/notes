@@ -1,0 +1,69 @@
+name: VitePress Deploy # 工作流名称修改为 VitePress
+
+on:
+  push:
+    branches:
+      - master # 仅当推送至 main 分支时触发部署
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest # 使用 GitHub 提供的最新 Ubuntu 环境
+
+    steps:
+      # 1. 检出代码仓库
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. 安装 Node.js 环境
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.11" # 推荐使用 LTS 版本
+
+      # 3. 安装项目依赖并构建
+      - name: Install and Build
+        run: |
+          npm install
+          npm run build # VitePress 默认构建命令
+
+      # 4. 准备部署文件
+      - name: Prepare deployment
+        run: |
+          sudo apt-get update && sudo apt-get install -y zip
+          cd .vitepress/dist # VitePress 默认输出目录
+          zip -r ../../dist-content.zip ./*
+
+      # 5. 上传构建产物（可选）
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-content
+          path: dist-content.zip
+
+      # 6. 通过 SCP 传输文件
+      - name: Transfer via SCP
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.PRIVATE_KEY }}
+          source: "dist-content.zip"
+          target: ${{ secrets.SERVER_DESTINATION }}
+
+      # 7. 执行部署
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.PRIVATE_KEY }}
+          script: |
+            DEPLOY_DIR=${{ secrets.SERVER_DESTINATION }}
+            cd $DEPLOY_DIR
+            rm -rf !(dist-content.zip)
+            unzip -o dist-content.zip
+            rm -f dist-content.zip
+            # 确保部署目录有正确的权限
+            chmod -R 755 .
+            # 重载 Nginx 或相关服务
+            nginx -s reload
