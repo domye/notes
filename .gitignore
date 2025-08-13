@@ -1,0 +1,28 @@
+# 依赖目录
+node_modules/
+.DS_Store
+
+# Vitepress 生成目录
+dist/
+.cache/
+.temp/
+
+# 本地环境文件
+.env
+.env.local
+.env.*.local
+
+# 日志文件
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# 编辑器目录
+.idea
+.vscode
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
