@@ -1,0 +1,71 @@
+name: VitePress Deploy
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. 检出代码
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. 设置 Node.js 环境
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.11"
+
+      # 3. 安装依赖并构建
+      - name: Install and Build
+        run: |
+          npm install
+          npm run docs:build  # 使用你的自定义构建命令
+
+      # 4. 准备部署文件
+      - name: Prepare deployment
+        run: |
+          sudo apt-get update && sudo apt-get install -y zip
+          cd docs/.vitepress/dist  # 根据你的项目结构调整路径
+          zip -r ../../../dist-content.zip ./*
+
+      # 5. (可选)上传构建产物
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-content
+          path: dist-content.zip
+
+      # 6. 传输文件到服务器
+      - name: Transfer via SCP
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.PRIVATE_KEY }}
+          source: "dist-content.zip"
+          target: ${{ secrets.SERVER_DESTINATION }}
+
+      # 7. 执行部署
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.PRIVATE_KEY }}
+          script: |
+            DEPLOY_DIR=${{ secrets.SERVER_DESTINATION }}
+            cd $DEPLOY_DIR
+            # 保留必要的文件（如 .htaccess 等）
+            find . -maxdepth 1 ! -name 'dist-content.zip' ! -name '.htaccess' ! -name '.' -exec rm -rf {} +
+            unzip -o dist-content.zip
+            rm -f dist-content.zip
+            # 设置权限
+            find . -type d -exec chmod 755 {} \;
+            find . -type f -exec chmod 644 {} \;
+            # 重载 Web 服务器
+            nginx -s reload || true
