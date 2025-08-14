@@ -9,15 +9,35 @@ const description = [
 ].toString();
 
 const teekConfig = defineTeekConfig({
+	sidebarTrigger: true,
 	author: { name: "Domye", link: "https://github.com/Domye" },
 	blogger: {
-		avatar:
-			"https://testingcf.jsdelivr.net/gh/Kele-Bingtang/static/user/avatar1.png",
+		avatar: "https://q1.qlogo.cn/g?b=qq&nk=1523610551&s=640",
 		shape: "circle-rotate",
-		name: "天客",
-		slogan: "朝圣的使徒，正在走向编程的至高殿堂！",
+		name: "Domye",
+		slogan: "且做闲庭信步!",
 		circleBgImg: "/blog/bg4.webp",
 		color: "#ffffff",
+	},
+	themeEnhance: {
+		position: "top", // 位置，top 为导航栏右侧，bottom 为右下角
+		// 布局切换配置
+		layoutSwitch: {
+			disabled: false,
+			defaultMode: "bothWidthAdjustable",
+		},
+		// 布局主题色配置
+		themeColor: {
+			disabled: false,
+			defaultColor: "vp-default",
+			defaultSpread: false,
+		},
+		// 聚光灯配置
+		spotlight: {
+			disabled: false,
+			defaultStyle: "aside",
+			defaultValue: true,
+		},
 	},
 	footerInfo: {
 		theme: {
@@ -25,7 +45,7 @@ const teekConfig = defineTeekConfig({
 		},
 		copyright: {
 			createYear: 2025,
-			suffix: "Teek",
+			suffix: "Domye",
 		},
 	},
 	codeBlock: {
@@ -46,20 +66,6 @@ const teekConfig = defineTeekConfig({
 				"https://github.com/Kele-Bingtang/vitepress-theme-teek/blob/master/docs",
 		},
 	},
-	siteAnalytics: [
-		{
-			provider: "baidu",
-			options: {
-				id: "d5ee872d9aa1ef8021f4a3921b2e9c2a",
-			},
-		},
-		{
-			provider: "google",
-			options: {
-				id: "G-K5GNDW3L7K",
-			},
-		},
-	],
 });
 
 // https://vitepress.dev/reference/site-config
@@ -68,12 +74,16 @@ export default defineConfig({
 	title: "月下·书斋",
 	description: description,
 	cleanUrls: false,
-	lastUpdated: true,
+	// lastUpdated: true,
 	lang: "zh-CN",
 	head: [
 		[
 			"link",
-			{ rel: "icon", type: "image/svg+xml", href: "/teek-logo-mini.svg" },
+			{
+				rel: "icon",
+				type: "icon",
+				href: "https://cdn.domye.top/uploads/07/1752738903.ico",
+			},
 		],
 		["link", { rel: "icon", type: "image/png", href: "/teek-logo-mini.png" }],
 		["meta", { property: "og:type", content: "website" }],
@@ -163,12 +173,10 @@ export default defineConfig({
 		nav: [
 			{ text: "首页", link: "/" },
 			{
-				text: "指南",
-				link: "/guide/intro",
+				text: "java",
+				link: "/02.Java/01.基础部分/01.Java基础知识介绍",
 				activeMatch: "/01.指南/",
 			},
-			{ text: "配置", link: "/reference/config", activeMatch: "/10.配置/" },
-			{ text: "开发", link: "/develop/intro", activeMatch: "/15.主题开发/" },
 			{
 				text: version,
 				items: [
@@ -186,7 +194,7 @@ export default defineConfig({
 		socialLinks: [
 			{
 				icon: "github",
-				link: "https://github.com/Kele-Bingtang/vitepress-theme-teek",
+				link: "https://github.com/domye",
 			},
 		],
 
