@@ -11,7 +11,7 @@ hero:
   actions:
     - theme: brand
       text: 开始
-      link: /guide/quickstart
+      link: /front/01.html/01.排版标签.html
     - theme: alt
       text: 配置
       link: /reference/config

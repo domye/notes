@@ -24,7 +24,7 @@ const teekConfig = defineTeekConfig({
 		// 布局切换配置
 		layoutSwitch: {
 			disabled: false,
-			defaultMode: "bothWidthAdjustable",
+			defaultMode: "fullWidth",
 		},
 		// 布局主题色配置
 		themeColor: {
@@ -74,6 +74,7 @@ export default defineConfig({
 	title: "月下·书斋",
 	description: description,
 	cleanUrls: false,
+
 	// lastUpdated: true,
 	lang: "zh-CN",
 	head: [
@@ -163,15 +164,29 @@ export default defineConfig({
 		returnToTopLabel: "返回顶部",
 		lastUpdatedText: "上次更新时间",
 		outline: {
-			level: [2, 4],
+			level: [2, 3],
 			label: "本页导航",
 		},
 		docFooter: {
 			prev: "上一页",
 			next: "下一页",
 		},
+
 		nav: [
 			{ text: "首页", link: "/" },
+			{
+				text: "前端",
+				items: [
+					{
+						text: "前端基础",
+						link: "/front/01.html/01.排版标签.html",
+					},
+					{
+						text: "更新日志",
+						link: "https://github.com/Kele-Bingtang/vitepress-theme-teek/blob/dev/CHANGELOG.md",
+					},
+				],
+			},
 			{
 				text: "java",
 				link: "/02.Java/01.基础部分/01.Java基础知识介绍",
