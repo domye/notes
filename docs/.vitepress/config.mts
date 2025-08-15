@@ -192,19 +192,6 @@ export default defineConfig({
 				link: "/02.Java/01.基础部分/01.Java基础知识介绍",
 				activeMatch: "/01.指南/",
 			},
-			{
-				text: version,
-				items: [
-					{
-						text: "历史版本",
-						link: "https://github.com/Kele-Bingtang/vitepress-theme-teek/releases",
-					},
-					{
-						text: "更新日志",
-						link: "https://github.com/Kele-Bingtang/vitepress-theme-teek/blob/dev/CHANGELOG.md",
-					},
-				],
-			},
 		],
 		socialLinks: [
 			{
