@@ -188,6 +188,19 @@ export default defineConfig({
 				],
 			},
 			{
+				text: "后端",
+				items: [
+					{
+						text: "Java面试",
+						link: "/interview/01.Java基础/01.概念.html",
+					},
+					{
+						text: "更新日志",
+						link: "https://github.com/Kele-Bingtang/vitepress-theme-teek/blob/dev/CHANGELOG.md",
+					},
+				],
+			},
+			{
 				text: "java",
 				link: "/02.Java/01.基础部分/01.Java基础知识介绍",
 				activeMatch: "/01.指南/",
