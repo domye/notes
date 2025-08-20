@@ -9,6 +9,8 @@ const description = [
 ].toString();
 
 const teekConfig = defineTeekConfig({
+	windowTransition: true,
+	loading: "正在加载中...",
 	sidebarTrigger: true,
 	author: { name: "Domye", link: "https://github.com/Domye" },
 	blogger: {
@@ -192,7 +194,7 @@ export default defineConfig({
 				items: [
 					{
 						text: "Java面试",
-						link: "/interview/01.Java基础/01.概念.html",
+						link: "/interview/01.Java基础/01.Java基础概念",
 					},
 					{
 						text: "更新日志",
