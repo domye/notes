@@ -80,7 +80,6 @@ import {
   useId,
   useModel,
   useSlots,
-  useTemplateRef,
   vModelDynamic,
   vModelRadio,
   vModelText,
@@ -220,18 +219,18 @@ var isFocusable = (element) => {
 var isClient = typeof window !== "undefined" && typeof document !== "undefined";
 var isServer = !isClient;
 var inBrowser = isClient;
-var getNowDate = () => {
-  return formatDate(/* @__PURE__ */ new Date(), "yyyy-MM-dd hh:mm:ss");
+var getNowDate = (format = "yyyy-MM-dd hh:mm:ss", utc = true) => {
+  return formatDate(/* @__PURE__ */ new Date(), format, utc);
 };
-var formatDate = (date, format = "yyyy-MM-dd hh:mm:ss") => {
+var formatDate = (date, format = "yyyy-MM-dd hh:mm:ss", utc = true) => {
   if (!date) return "";
-  const d = new Date(date);
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  const hours = String(d.getHours()).padStart(2, "0");
-  const minutes = String(d.getMinutes()).padStart(2, "0");
-  const seconds = String(d.getSeconds()).padStart(2, "0");
+  const dateObj = new Date(date);
+  const year = utc ? dateObj.getUTCFullYear() : dateObj.getFullYear();
+  const month = String((utc ? dateObj.getUTCMonth() : dateObj.getMonth()) + 1).padStart(2, "0");
+  const day = String(utc ? dateObj.getUTCDate() : dateObj.getDate()).padStart(2, "0");
+  const hours = String(utc ? dateObj.getUTCHours() : dateObj.getHours()).padStart(2, "0");
+  const minutes = String(utc ? dateObj.getUTCMinutes() : dateObj.getMinutes()).padStart(2, "0");
+  const seconds = String(utc ? dateObj.getUTCSeconds() : dateObj.getSeconds()).padStart(2, "0");
   return format.replace("yyyy", year.toString()).replace("MM", month).replace("dd", day).replace("hh", hours).replace("mm", minutes).replace("ss", seconds);
 };
 var formatDiffDate = (startDate, endDate) => {
@@ -1484,18 +1483,38 @@ var useAnchorScroll = () => {
 var DEFAULT_SITE_PV = 9999;
 var DEFAULT_SITE_UV = 9999;
 var DEFAULT_PAGE_PV = 9999;
+var DEFAULT_PAGE_UV = 9999;
+var DEFAULT_TODAY_DATA = {
+  site_pv: 9999,
+  site_uv: 9999,
+  page_pv: 9999,
+  page_uv: 9999
+};
+var DEFAULT_YESTERDAY_DATA = {
+  site_pv: 9999,
+  site_uv: 9999,
+  page_pv: 9999,
+  page_uv: 9999
+};
 var useUvPv = (immediate = false, options = {}) => {
   const { url, provider = "busuanzi", tryRequest = false, tryCount = 5, tryIterationTime = 2e3, requestFn } = options;
   const sitePv = ref(0);
   const siteUv = ref(0);
   const pagePv = ref(0);
+  const pageUv = ref(0);
+  const today = ref({ site_pv: 0, site_uv: 0, page_pv: 0, page_uv: 0 });
+  const yesterday = ref({ site_pv: 0, site_uv: 0, page_pv: 0, page_uv: 0 });
   const isGet = ref(true);
   const request = () => {
     if (!isClient) return;
     if (isGet.value === false) return;
     isGet.value = false;
     const call = async (url2) => {
-      if (requestFn) return Promise.resolve(await requestFn(url2, createScript));
+      if (requestFn) {
+        const response = await requestFn(url2, createScript);
+        window.dispatchEvent(new CustomEvent("views", { detail: response }));
+        return Promise.resolve(response);
+      }
       switch (provider) {
         case "busuanzi":
           return callBusuanzi(url2);
@@ -1509,7 +1528,11 @@ var useUvPv = (immediate = false, options = {}) => {
       sitePv.value = data.site_pv || DEFAULT_SITE_PV;
       siteUv.value = data.site_uv || DEFAULT_SITE_UV;
       pagePv.value = data.page_pv || DEFAULT_PAGE_PV;
+      pageUv.value = data.page_uv || DEFAULT_PAGE_UV;
+      today.value = data.today || DEFAULT_TODAY_DATA;
+      yesterday.value = data.yesterday || DEFAULT_YESTERDAY_DATA;
       isGet.value = true;
+      window.dispatchEvent(new CustomEvent("views", { detail: data }));
     });
   };
   immediate && nextTick(request);
@@ -1533,6 +1556,9 @@ var useUvPv = (immediate = false, options = {}) => {
     sitePv: readonly(sitePv),
     siteUv: readonly(siteUv),
     pagePv: readonly(pagePv),
+    pageUv: readonly(pageUv),
+    today: readonly(today),
+    yesterday: readonly(yesterday),
     isGet: readonly(isGet),
     request
   };
@@ -1625,6 +1651,109 @@ var useClipboard = (timeout = 1500) => {
     }, timeout);
   };
   return { copy, text, copied, isSupported };
+};
+
+// node_modules/vitepress-theme-teek/es/composables/cssModule/namespace.module.scss.mjs
+var namespaceModule = { "namespace": "tk" };
+
+// node_modules/vitepress-theme-teek/es/composables/useNamespace.mjs
+var useNamespace = (block = "", namespaceOverrides) => {
+  const finalNamespace = namespaceOverrides || namespaceModule.namespace;
+  const b = (blockSuffix) => {
+    return createBem(finalNamespace, block, blockSuffix);
+  };
+  const e = (element) => {
+    return createBem(finalNamespace, block, "", element);
+  };
+  const m = (modifier) => {
+    return createBem(finalNamespace, block, "", "", modifier);
+  };
+  const be = (blockSuffix, element) => {
+    return createBem(finalNamespace, block, blockSuffix, element);
+  };
+  const bm = (blockSuffix, modifier) => {
+    return createBem(finalNamespace, block, blockSuffix, "", modifier);
+  };
+  const em = (element, modifier) => {
+    return createBem(finalNamespace, block, "", element, modifier);
+  };
+  const bem = (blockSuffix, element, modifier) => {
+    return createBem(finalNamespace, block, blockSuffix, element, modifier);
+  };
+  const is2 = (name, bool2 = true) => {
+    return bool2 ? `is-${name}` : "";
+  };
+  const has = (name, bool2 = true) => {
+    return bool2 ? `has-${name}` : "";
+  };
+  const createBem = (namespace, block2, blockSuffix, element, modifier) => {
+    let space = `${namespace}-${block2}`;
+    if (blockSuffix) space += `-${blockSuffix}`;
+    if (element) space += `__${element}`;
+    if (modifier) space += `--${modifier}`;
+    return space;
+  };
+  const join = (scope) => {
+    return `${finalNamespace}-${scope}`;
+  };
+  const cssVar = (name) => `var(--${finalNamespace}-${name})`;
+  const cssVarName = (name) => `--${finalNamespace}-${name}`;
+  const storageKey = (...key) => `${finalNamespace}:${key.join(":")}`;
+  return {
+    namespaceModule,
+    namespace: namespaceModule.namespace,
+    b,
+    e,
+    m,
+    be,
+    bm,
+    em,
+    bem,
+    is: is2,
+    has,
+    createBem,
+    join,
+    cssVar,
+    cssVarName,
+    storageKey
+  };
+};
+
+// node_modules/vitepress-theme-teek/es/composables/useCopyBanner.mjs
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
+var useCopyBanner = (text = "复制成功，复制和转载请标注本文地址", timeout = 3e3) => {
+  if (!isClient) return;
+  const ns4 = useNamespace("copy-banner");
+  const listenerCopy = () => {
+    var _a;
+    if (!((_a = window.getSelection()) == null ? void 0 : _a.toString().trim())) return;
+    hideAllCopyBanner();
+    const slideClass = ns4.e("slide");
+    const banner = document.createElement("div");
+    const slide = document.createElement("div");
+    banner.className = ns4.b();
+    banner.innerHTML = `
+      <div class="${ns4.e("content")}">
+        <p class="${ns4.e("desc")}">${text}</p>
+      </div>
+    `;
+    slide.className = slideClass;
+    banner.appendChild(slide);
+    document.body.appendChild(banner);
+    setTimeout(() => {
+      banner.classList.add("is-show");
+      slide.style.width = "100%";
+    }, 10);
+    setTimeout(() => {
+      banner.classList.add("is-hide");
+    }, timeout);
+  };
+  const hideAllCopyBanner = () => {
+    const banner = document.querySelector(`.${ns4.b()}`);
+    if (!banner) return;
+    banner.remove();
+  };
+  useEventListener(document, "copy", listenerCopy, { passive: true });
 };
 
 // node_modules/vitepress-theme-teek/es/composables/useDebounce.mjs
@@ -1988,72 +2117,6 @@ var useMediaQuery = (query, match = true) => {
   return computed(() => match ? matches.value : !matches.value);
 };
 
-// node_modules/vitepress-theme-teek/es/composables/cssModule/namespace.module.scss.mjs
-var namespaceModule = { "namespace": "tk" };
-
-// node_modules/vitepress-theme-teek/es/composables/useNamespace.mjs
-var useNamespace = (block = "", namespaceOverrides) => {
-  const finalNamespace = namespaceOverrides || namespaceModule.namespace;
-  const b = (blockSuffix) => {
-    return createBem(finalNamespace, block, blockSuffix);
-  };
-  const e = (element) => {
-    return createBem(finalNamespace, block, "", element);
-  };
-  const m = (modifier) => {
-    return createBem(finalNamespace, block, "", "", modifier);
-  };
-  const be = (blockSuffix, element) => {
-    return createBem(finalNamespace, block, blockSuffix, element);
-  };
-  const bm = (blockSuffix, modifier) => {
-    return createBem(finalNamespace, block, blockSuffix, "", modifier);
-  };
-  const em = (element, modifier) => {
-    return createBem(finalNamespace, block, "", element, modifier);
-  };
-  const bem = (blockSuffix, element, modifier) => {
-    return createBem(finalNamespace, block, blockSuffix, element, modifier);
-  };
-  const is2 = (name, bool2 = true) => {
-    return bool2 ? `is-${name}` : "";
-  };
-  const has = (name, bool2 = true) => {
-    return bool2 ? `has-${name}` : "";
-  };
-  const createBem = (namespace, block2, blockSuffix, element, modifier) => {
-    let space = `${namespace}-${block2}`;
-    if (blockSuffix) space += `-${blockSuffix}`;
-    if (element) space += `__${element}`;
-    if (modifier) space += `--${modifier}`;
-    return space;
-  };
-  const join = (scope) => {
-    return `${finalNamespace}-${scope}`;
-  };
-  const cssVar = (name) => `var(--${finalNamespace}-${name})`;
-  const cssVarName = (name) => `--${finalNamespace}-${name}`;
-  const storageKey = (...key) => `${finalNamespace}:${key.join(":")}`;
-  return {
-    namespaceModule,
-    namespace: namespaceModule.namespace,
-    b,
-    e,
-    m,
-    be,
-    bm,
-    em,
-    bem,
-    is: is2,
-    has,
-    createBem,
-    join,
-    cssVar,
-    cssVarName,
-    storageKey
-  };
-};
-
 // node_modules/vitepress-theme-teek/es/composables/useWindowSize.mjs
 var useWindowSize = (sizeChangedCallback, options = {}) => {
   const {
@@ -2064,6 +2127,8 @@ var useWindowSize = (sizeChangedCallback, options = {}) => {
   } = options;
   const width = shallowRef(initialWidth);
   const height = shallowRef(initialHeight);
+  let stop = () => {
+  };
   const update = useDebounce(() => {
     if (!isClient) return;
     if (type2 === "outer") {
@@ -2084,11 +2149,11 @@ var useWindowSize = (sizeChangedCallback, options = {}) => {
   }, 100);
   update();
   useMounted(update);
-  useEventListener(() => window, "resize", update, { passive: true });
+  stop = useEventListener(() => window, "resize", update, { passive: true });
   if (isClient && type2 === "visual" && window.visualViewport) {
-    useEventListener(window.visualViewport, "resize", update, { passive: true });
+    stop = useEventListener(window.visualViewport, "resize", update, { passive: true });
   }
-  return { width, height, update };
+  return { width, height, update, stop };
 };
 
 // node_modules/vitepress-theme-teek/es/composables/useScrollbarSize.mjs
@@ -2389,7 +2454,6 @@ var useSwitchData = (dataList, options = {}) => {
     onAfterUpdate
   } = options;
   const dataListComputed = computed(() => toValue(dataList) || []);
-  const data = ref(dataListComputed.value[0]);
   const index2 = ref(-1);
   let timer;
   const splitOutRandom = (dataList2) => {
@@ -2400,6 +2464,7 @@ var useSwitchData = (dataList, options = {}) => {
     index2.value = newIndex;
     return dataList2[newIndex];
   };
+  const data = ref(shuffle ? splitOutRandom(dataListComputed.value) : dataListComputed.value[0]);
   const splitOutOrder = (dataList2) => {
     index2.value = (index2.value + 1) % dataList2.length;
     return dataList2[index2.value];
@@ -2682,10 +2747,18 @@ var useThemeColor = (color, ignoreList) => {
 
 // node_modules/vitepress-theme-teek/es/composables/useViewTransition.mjs
 import { useData as useData3 } from "vitepress";
-var useViewTransition = (duration = 300, easing = "ease-in") => {
-  const { isDark, theme } = useData3();
-  const isOpenViewTransition = theme.value.viewTransition ?? true;
-  if (!isOpenViewTransition) return;
+var useViewTransition = (options) => {
+  if (!isClient) return;
+  const {
+    enabled = true,
+    mode = "out-in",
+    duration = options.mode === "out-in" ? 300 : 600,
+    easing = "ease-in"
+  } = options;
+  if (!enabled) return;
+  const outIn = mode === "out-in";
+  const { isDark } = useData3();
+  document.documentElement.setAttribute("view-transition", mode);
   const enableTransitions = () => "startViewTransition" in document && window.matchMedia("(prefers-reduced-motion: no-preference)").matches;
   provide("toggle-appearance", async ({ clientX: x, clientY: y }) => {
     if (!enableTransitions()) {
@@ -2700,12 +2773,14 @@ var useViewTransition = (duration = 300, easing = "ease-in") => {
       isDark.value = !isDark.value;
       await nextTick();
     }).ready;
+    const isDarkCondition = outIn ? isDark.value : false;
     document.documentElement.animate(
-      { clipPath: isDark.value ? clipPath.reverse() : clipPath },
+      { clipPath: isDarkCondition ? clipPath.reverse() : clipPath },
       {
         duration,
         easing,
-        pseudoElement: `::view-transition-${isDark.value ? "old" : "new"}(root)`
+        fill: "forwards",
+        pseudoElement: `::view-transition-${isDarkCondition ? "old" : "new"}(root)`
       }
     );
   });
@@ -2790,7 +2865,7 @@ var useWindowTransition = (element, immediate = true) => {
   };
   const initTransition = (el) => {
     el.classList.add("scroll__animate");
-    const { createIntersectionObserver, cleanIntersectionObserver } = useIntersectionObserver(
+    const { create, clean } = useIntersectionObserver(
       el,
       (entries) => {
         entries.forEach((entry) => {
@@ -2798,7 +2873,7 @@ var useWindowTransition = (element, immediate = true) => {
             requestAnimationFrame(() => {
               try {
                 el.classList.add("visible");
-                cleanIntersectionObserver();
+                clean();
               } catch (error) {
                 console.error("初始化动画失败:", error);
               }
@@ -2808,8 +2883,8 @@ var useWindowTransition = (element, immediate = true) => {
       },
       0.1
     );
-    createIntersectionObserver();
-    cleanup.push(cleanIntersectionObserver);
+    create();
+    cleanup.push(clean);
   };
   const stop = () => {
     cleanup.forEach((fn) => fn());
@@ -2837,7 +2912,7 @@ var useWindowTransition = (element, immediate = true) => {
 var useIntersectionObserver = (observerDom, callback, threshold) => {
   let intersectionObserver = null;
   const createIntersectionObserver = () => {
-    const observerDomValue = observerDom;
+    const observerDomValue = unref(observerDom);
     if (intersectionObserver || !observerDomValue) return;
     intersectionObserver = new IntersectionObserver(callback, { threshold });
     intersectionObserver.observe(observerDomValue);
@@ -2848,7 +2923,8 @@ var useIntersectionObserver = (observerDom, callback, threshold) => {
       intersectionObserver = null;
     }
   };
-  return { createIntersectionObserver, cleanIntersectionObserver };
+  useScopeDispose(cleanIntersectionObserver);
+  return { create: createIntersectionObserver, clean: cleanIntersectionObserver };
 };
 
 // node_modules/vitepress-theme-teek/es/composables/useZIndex.mjs
@@ -5960,10 +6036,11 @@ var createCardContainer = (md, option) => {
 };
 
 // node_modules/vitepress-theme-teek/es/version.mjs
-var version = "1.4.3";
+var version = "1.5.1";
 
 // node_modules/vitepress-theme-teek/es/components/theme/ConfigProvider/index.mjs
-import { useData as useData4 } from "vitepress";
+import { useData as useData4, useRoute } from "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 
 // node_modules/vitepress-theme-teek/es/config/post/helper.mjs
 var emptyPost = {
@@ -5987,7 +6064,13 @@ var TeekConfigProvider = (layout) => {
     setup(_, { slots }) {
       provide(postsContext, useAllPosts());
       useAnchorScroll().startWatch();
-      useViewTransition();
+      const { getTeekConfig } = useTeekConfig();
+      const viewTransitionConfig = getTeekConfig("viewTransition", {
+        enabled: true,
+        mode: "out-in",
+        easing: "ease-in"
+      });
+      viewTransitionConfig.enabled && useViewTransition(viewTransitionConfig);
       return () => h(layout, null, slots);
     }
   });
@@ -5996,7 +6079,7 @@ var useTeekConfig = () => {
   const { theme, frontmatter } = useData4();
   const teekConfigProvide = inject(teekConfigContext, {});
   const getTeekConfig = (key, defaultValue) => {
-    var _a;
+    var _a, _b;
     let dv = defaultValue;
     if (isFunction(defaultValue)) dv = defaultValue();
     if (!key) {
@@ -6004,7 +6087,7 @@ var useTeekConfig = () => {
     }
     const valueFromTheme = theme.value[key];
     const valueFromFrontmatter = ((_a = frontmatter.value.tk) == null ? void 0 : _a[key]) ?? frontmatter.value[key];
-    const valueFromInject = unref(teekConfigProvide)[key];
+    const valueFromInject = (_b = unref(teekConfigProvide)) == null ? void 0 : _b[key];
     if (isObject2(valueFromTheme) || isObject2(valueFromFrontmatter) || isObject2(valueFromInject)) {
       return { ...dv, ...valueFromTheme, ...valueFromFrontmatter, ...valueFromInject };
     }
@@ -6121,18 +6204,38 @@ var useCommon = () => {
   const isMobile = useMediaQuery("(max-width: 768px)");
   return { isMobile };
 };
+var useSidebar = () => {
+  const hasSidebar = ref(true);
+  const route = useRoute();
+  watch(
+    () => route.path,
+    async () => {
+      if (!isClient) return;
+      await nextTick();
+      const sidebarDom = document.querySelector(".VPSidebar");
+      if (sidebarDom) hasSidebar.value = true;
+      else hasSidebar.value = false;
+    },
+    { immediate: true, flush: "post" }
+  );
+  return { hasSidebar };
+};
 
 // node_modules/vitepress-theme-teek/es/components/theme/CataloguePage/src/index.vue2.mjs
 import { useData as useData6 } from "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 
 // node_modules/vitepress-theme-teek/es/components/common/ArticlePage/src/index.vue2.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 
 // node_modules/vitepress-theme-teek/es/components/common/ArticlePage/src/components/DocAsideOutline.vue2.mjs
 import { useData as useData5, onContentUpdated } from "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 
 // node_modules/vitepress-theme-teek/es/components/common/ArticlePage/src/components/outline.mjs
 import { getScrollOffset } from "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var ignoreRE = /\b(?:VPBadge|header-anchor|footnote-ref|ignore-header)\b/;
 var resolvedHeaders = [];
 function resolveTitle(theme) {
@@ -6266,6 +6369,7 @@ function buildTree(data, min, max) {
 
 // node_modules/vitepress-theme-teek/es/components/common/ArticlePage/src/components/DocAsideOutlineItem.vue2.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var _hoisted_1 = ["href", "title"];
 var _sfc_main = defineComponent({
   ...{ name: "DocAsideOutlineItem" },
@@ -6286,13 +6390,13 @@ var _sfc_main = defineComponent({
       return openBlock(), createElementBlock(
         "ul",
         {
-          class: normalizeClass([unref(ns4).b(), _ctx.root ? unref(ns4).is("root") : unref(ns4).is("nested")])
+          class: normalizeClass([unref(ns4).b(), __props.root ? unref(ns4).is("root") : unref(ns4).is("nested")])
         },
         [
           (openBlock(true), createElementBlock(
             Fragment,
             null,
-            renderList(_ctx.headers, ({ children, link, title }) => {
+            renderList(__props.headers, ({ children, link, title }) => {
               return openBlock(), createElementBlock("li", { key: link }, [
                 createBaseVNode("a", {
                   class: normalizeClass(unref(ns4).m("link")),
@@ -6404,10 +6508,10 @@ var _sfc_main3 = defineComponent({
       return openBlock(), createElementBlock(
         "div",
         {
-          class: normalizeClass([unref(ns4).b(), unref(ns4).is("aside", _ctx.aside)])
+          class: normalizeClass([unref(ns4).b(), unref(ns4).is("aside", __props.aside)])
         },
         [
-          _ctx.aside ? (openBlock(), createElementBlock(
+          __props.aside ? (openBlock(), createElementBlock(
             "div",
             {
               key: 0,
@@ -6432,10 +6536,12 @@ var _sfc_main3 = defineComponent({
           createBaseVNode(
             "div",
             {
-              class: normalizeClass([unref(ns4).join("doc"), { "vp-doc": _ctx.doc }])
+              class: normalizeClass([unref(ns4).join("doc"), { "vp-doc": __props.doc }])
             },
             [
-              renderSlot(_ctx.$slots, "default")
+              createBaseVNode("div", null, [
+                renderSlot(_ctx.$slots, "default")
+              ])
             ],
             2
             /* CLASS */
@@ -6450,9 +6556,11 @@ var _sfc_main3 = defineComponent({
 
 // node_modules/vitepress-theme-teek/es/components/theme/CataloguePage/src/CatalogueItem.vue2.mjs
 import { withBase as withBase2 } from "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 
 // node_modules/vitepress-theme-teek/es/components/common/TitleTag/src/index.vue2.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var _sfc_main4 = defineComponent({
   ...{ name: "TitleTag" },
   __name: "index",
@@ -6465,16 +6573,16 @@ var _sfc_main4 = defineComponent({
   setup(__props) {
     const ns4 = useNamespace("title-tag");
     return (_ctx, _cache) => {
-      return _ctx.text || _ctx.$slots.default ? (openBlock(), createElementBlock(
+      return __props.text || _ctx.$slots.default ? (openBlock(), createElementBlock(
         "span",
         {
           key: 0,
-          class: normalizeClass([unref(ns4).b(), _ctx.type && unref(ns4).m(_ctx.type), _ctx.position && unref(ns4).m(_ctx.position), _ctx.size && unref(ns4).m(_ctx.size)])
+          class: normalizeClass([unref(ns4).b(), __props.type && unref(ns4).m(__props.type), __props.position && unref(ns4).m(__props.position), __props.size && unref(ns4).m(__props.size)])
         },
         [
           renderSlot(_ctx.$slots, "default", {}, () => [
             createTextVNode(
-              toDisplayString(_ctx.text),
+              toDisplayString(__props.text),
               1
               /* TEXT */
             )
@@ -6510,62 +6618,62 @@ var _sfc_main5 = defineComponent({
       return openBlock(), createElementBlock(
         "li",
         {
-          class: normalizeClass(_ctx.item.children ? unref(nsSub).b() : unref(nsItem).b())
+          class: normalizeClass(__props.item.children ? unref(nsSub).b() : unref(nsItem).b())
         },
         [
-          !_ctx.item.children ? (openBlock(), createElementBlock("a", {
+          !__props.item.children ? (openBlock(), createElementBlock("a", {
             key: 0,
-            href: _ctx.item.link && unref(withBase2)(_ctx.item.link),
-            "aria-label": `${_ctx.index}. ${_ctx.item.title}`
+            href: __props.item.url && unref(withBase2)(__props.item.url),
+            "aria-label": `${__props.index}. ${__props.item.title}`
           }, [
             createTextVNode(
-              toDisplayString(_ctx.index) + ". ",
+              toDisplayString(__props.index) + ". ",
               1
               /* TEXT */
             ),
             createBaseVNode("span", {
-              innerHTML: _ctx.item.title
+              innerHTML: __props.item.title
             }, null, 8, _hoisted_2),
-            ((_a = _ctx.item.frontmatter) == null ? void 0 : _a.titleTag) ? (openBlock(), createBlock(unref(_sfc_main4), {
+            ((_a = __props.item.frontmatter) == null ? void 0 : _a.titleTag) ? (openBlock(), createBlock(unref(_sfc_main4), {
               key: 0,
-              text: (_b = _ctx.item.frontmatter) == null ? void 0 : _b.titleTag,
+              text: (_b = __props.item.frontmatter) == null ? void 0 : _b.titleTag,
               position: "right",
               size: "small",
-              "aria-label": (_c = _ctx.item.frontmatter) == null ? void 0 : _c.titleTag
+              "aria-label": (_c = __props.item.frontmatter) == null ? void 0 : _c.titleTag
             }, null, 8, ["text", "aria-label"])) : createCommentVNode("v-if", true)
-          ], 8, _hoisted_12)) : _ctx.item.children.length > 0 ? (openBlock(), createElementBlock(
+          ], 8, _hoisted_12)) : __props.item.children.length ? (openBlock(), createElementBlock(
             Fragment,
             { key: 1 },
             [
               createBaseVNode("div", {
-                id: _ctx.item.title,
+                id: __props.item.title,
                 class: normalizeClass(unref(nsSub).e("title")),
                 role: "group",
-                "aria-labelledby": `${_ctx.item.title}-label`
+                "aria-labelledby": `${__props.item.title}-label`
               }, [
                 createBaseVNode("a", {
-                  href: `#${_ctx.item.title}`,
+                  href: `#${__props.item.title}`,
                   class: "anchor",
-                  "aria-label": _ctx.item.title
+                  "aria-label": __props.item.title
                 }, "#", 8, _hoisted_4),
                 createBaseVNode("span", {
-                  id: `${_ctx.item.title}-label`
-                }, toDisplayString(`${_ctx.index}. ${_ctx.item.title}`), 9, _hoisted_5)
+                  id: `${__props.item.title}-label`
+                }, toDisplayString(`${__props.index}. ${__props.item.title}`), 9, _hoisted_5)
               ], 10, _hoisted_3),
-              _ctx.item.children ? (openBlock(), createElementBlock("ul", {
+              __props.item.children ? (openBlock(), createElementBlock("ul", {
                 key: 0,
                 class: normalizeClass(`${unref(nsSub).e("inline")} flx-wrap-between`),
-                "aria-label": _ctx.item.title
+                "aria-label": __props.item.title
               }, [
                 createCommentVNode(" 递归自己 "),
                 (openBlock(true), createElementBlock(
                   Fragment,
                   null,
-                  renderList(_ctx.item.children, (item, i) => {
+                  renderList(__props.item.children, (item, i) => {
                     return openBlock(), createBlock(_component_CatalogueItem, {
                       key: i,
                       item,
-                      index: `${_ctx.index}-${i + 1}`
+                      index: `${__props.index}-${i + 1}`
                     }, null, 8, ["item", "index"]);
                   }),
                   128
@@ -6685,9 +6793,11 @@ var _sfc_main6 = defineComponent({
 
 // node_modules/vitepress-theme-teek/es/components/theme/ArchivesPage/src/index.vue2.mjs
 import { useData as useData7, withBase as withBase3 } from "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 
 // node_modules/vitepress-theme-teek/es/components/theme/ArticleTitle/src/index.vue2.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 
 // node_modules/@vue/compiler-core/dist/compiler-core.esm-bundler.js
 var FRAGMENT = Symbol(true ? `Fragment` : ``);
@@ -12649,20 +12759,20 @@ var _sfc_main7 = defineComponent({
         class: normalizeClass(unref(ns4).b()),
         "aria-label": unref(t)("tk.articleTitle.label")
       }, [
-        _ctx.post.frontmatter.titleTag && ((_a = _ctx.titleTagProps) == null ? void 0 : _a.position) === "left" ? (openBlock(), createBlock(unref(_sfc_main4), mergeProps({
+        __props.post.frontmatter.titleTag && ((_a = __props.titleTagProps) == null ? void 0 : _a.position) === "left" ? (openBlock(), createBlock(unref(_sfc_main4), mergeProps({
           key: 0,
-          text: _ctx.post.frontmatter.titleTag
-        }, _ctx.titleTagProps, {
-          "aria-label": _ctx.post.frontmatter.titleTag
+          text: __props.post.frontmatter.titleTag
+        }, __props.titleTagProps, {
+          "aria-label": __props.post.frontmatter.titleTag
         }), null, 16, ["text", "aria-label"])) : createCommentVNode("v-if", true),
         renderSlot(_ctx.$slots, "default", {}, () => [
-          _ctx.post.title ? (openBlock(), createBlock(resolveDynamicComponent(unref(createDynamicComponent)(_ctx.post.title)), { key: 0 })) : createCommentVNode("v-if", true)
+          __props.post.title ? (openBlock(), createBlock(resolveDynamicComponent(unref(createDynamicComponent)(__props.post.title)), { key: 0 })) : createCommentVNode("v-if", true)
         ]),
-        _ctx.post.frontmatter.titleTag && ((_b = _ctx.titleTagProps) == null ? void 0 : _b.position) === "right" ? (openBlock(), createBlock(unref(_sfc_main4), mergeProps({
+        __props.post.frontmatter.titleTag && ((_b = __props.titleTagProps) == null ? void 0 : _b.position) === "right" ? (openBlock(), createBlock(unref(_sfc_main4), mergeProps({
           key: 1,
-          text: _ctx.post.frontmatter.titleTag
-        }, _ctx.titleTagProps, {
-          "aria-label": _ctx.post.frontmatter.titleTag
+          text: __props.post.frontmatter.titleTag
+        }, __props.titleTagProps, {
+          "aria-label": __props.post.frontmatter.titleTag
         }), null, 16, ["text", "aria-label"])) : createCommentVNode("v-if", true)
       ], 10, _hoisted_14);
     };
@@ -12698,7 +12808,7 @@ var _sfc_main8 = defineComponent({
       };
     });
     const windowTransition = useWindowTransitionConfig((config) => config.archives);
-    const timelineItemListInstance = useTemplateRef("timelineItemListInstance");
+    const timelineItemListInstance = ref(null);
     const { start } = useWindowTransition(timelineItemListInstance, false);
     onMounted(() => {
       windowTransition.value && start();
@@ -12883,6 +12993,7 @@ var _sfc_main8 = defineComponent({
 
 // node_modules/vitepress-theme-teek/es/components/theme/ArticleOverviewPage/src/index.vue2.mjs
 import { useData as useData8, withBase as withBase4 } from "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var _hoisted_16 = { key: 0 };
 var _hoisted_24 = ["href", "aria-label"];
 var _hoisted_34 = ["id"];
@@ -13096,9 +13207,11 @@ var _sfc_main9 = defineComponent({
 
 // node_modules/vitepress-theme-teek/es/components/theme/LoginPage/src/index.vue2.mjs
 import { useRouter as useRouter2, useData as useData9, withBase as withBase5 } from "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 
 // node_modules/vitepress-theme-teek/es/components/common/Icon/src/index.vue2.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 
 // node_modules/vitepress-theme-teek/es/components/common/Icon/src/components/SvgIcon.vue2.mjs
 var _hoisted_17 = ["innerHTML"];
@@ -13110,7 +13223,7 @@ var _sfc_main10 = defineComponent({
   },
   setup(__props) {
     return (_ctx, _cache) => {
-      return openBlock(), createElementBlock("i", { innerHTML: _ctx.icon }, null, 8, _hoisted_17);
+      return openBlock(), createElementBlock("i", { innerHTML: __props.icon }, null, 8, _hoisted_17);
     };
   }
 });
@@ -13135,24 +13248,24 @@ var _sfc_main11 = defineComponent({
   },
   setup(__props) {
     return (_ctx, _cache) => {
-      return _ctx.iconType === "unicode" ? (openBlock(), createElementBlock(
+      return __props.iconType === "unicode" ? (openBlock(), createElementBlock(
         "i",
         _hoisted_18,
-        toDisplayString(_ctx.icon),
+        toDisplayString(__props.icon),
         1
         /* TEXT */
-      )) : _ctx.iconType === "iconfont" ? (openBlock(), createElementBlock(
+      )) : __props.iconType === "iconfont" ? (openBlock(), createElementBlock(
         "i",
         {
           key: 1,
-          class: normalizeClass(`iconfont ${_ctx.icon}`)
+          class: normalizeClass(`iconfont ${__props.icon}`)
         },
         null,
         2
         /* CLASS */
-      )) : _ctx.iconType === "symbol" ? (openBlock(), createElementBlock("svg", _hoisted_25, [
+      )) : __props.iconType === "symbol" ? (openBlock(), createElementBlock("svg", _hoisted_25, [
         createBaseVNode("use", {
-          "xlink:href": `#${_ctx.icon}`
+          "xlink:href": `#${__props.icon}`
         }, null, 8, _hoisted_35)
       ])) : createCommentVNode("v-if", true);
     };
@@ -14829,7 +14942,7 @@ var _sfc_main12 = defineComponent({
     });
     return (_ctx, _cache) => {
       return openBlock(), createBlock(unref(Icon), {
-        icon: _ctx.icon,
+        icon: __props.icon,
         style: { outline: "none" }
       }, null, 8, ["icon"]);
     };
@@ -14846,7 +14959,7 @@ var _sfc_main13 = defineComponent({
   setup(__props) {
     return (_ctx, _cache) => {
       return openBlock(), createBlock(unref(Icon), {
-        icon: _ctx.icon,
+        icon: __props.icon,
         style: { outline: "none" }
       }, null, 8, ["icon"]);
     };
@@ -14921,13 +15034,13 @@ var _sfc_main14 = defineComponent({
         "i",
         {
           key: 0,
-          class: normalizeClass([unref(ns4).b(), unref(ns4).is("hover", _ctx.hover)]),
+          class: normalizeClass([unref(ns4).b(), unref(ns4).is("hover", __props.hover)]),
           style: normalizeStyle(getStyle())
         },
         [
           unref(slot).default ? renderSlot(_ctx.$slots, "default", { key: 0 }) : isComponent2.value ? (openBlock(), createBlock(resolveDynamicComponent(finalIcon.value), {
             key: 1,
-            size: _ctx.size
+            size: __props.size
           }, null, 8, ["size"])) : isIconifyOffline.value ? (openBlock(), createBlock(_sfc_main12, {
             key: 2,
             icon: finalIcon.value
@@ -14943,20 +15056,20 @@ var _sfc_main14 = defineComponent({
         /* CLASS, STYLE */
       )) : isSvgIconHtml.value ? (openBlock(), createElementBlock("i", {
         key: 1,
-        innerHTML: _ctx.icon,
-        class: normalizeClass([unref(ns4).b(), unref(ns4).is("hover", _ctx.hover)]),
+        innerHTML: __props.icon,
+        class: normalizeClass([unref(ns4).b(), unref(ns4).is("hover", __props.hover)]),
         style: normalizeStyle(getStyle())
       }, null, 14, _hoisted_19)) : isFontIcon.value && fontIconType.value ? (openBlock(), createBlock(_sfc_main11, {
         key: 2,
         icon: finalIcon.value,
         iconType: fontIconType.value,
-        class: normalizeClass([unref(ns4).b(), unref(ns4).is("hover", _ctx.hover)]),
+        class: normalizeClass([unref(ns4).b(), unref(ns4).is("hover", __props.hover)]),
         style: normalizeStyle(getStyle())
       }, null, 8, ["icon", "iconType", "class", "style"])) : isImage.value ? (openBlock(), createElementBlock("img", {
         key: 3,
         src: finalIcon.value,
-        alt: _ctx.imgAlt,
-        class: normalizeClass([unref(ns4).b(), unref(ns4).is("hover", _ctx.hover)]),
+        alt: __props.imgAlt,
+        class: normalizeClass([unref(ns4).b(), unref(ns4).is("hover", __props.hover)]),
         style: normalizeStyle(getStyle())
       }, null, 14, _hoisted_26)) : createCommentVNode("v-if", true);
     };
@@ -14966,6 +15079,7 @@ var _sfc_main14 = defineComponent({
 // node_modules/vitepress-theme-teek/es/components/common/Message/src/index.vue2.mjs
 import { VPBadge } from "vitepress/theme";
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 
 // node_modules/vitepress-theme-teek/es/components/common/Message/src/message.mjs
 var messageTypes = ["primary", "success", "info", "warning", "error"];
@@ -15130,31 +15244,31 @@ var _sfc_main15 = defineComponent({
       return openBlock(), createBlock(Transition, {
         name: unref(ns4).b("fade"),
         onBeforeEnter: _cache[0] || (_cache[0] = ($event) => isStartTransition.value = true),
-        onBeforeLeave: _ctx.onClose,
+        onBeforeLeave: __props.onClose,
         onAfterLeave: _cache[1] || (_cache[1] = ($event) => _ctx.$emit("destroy")),
         persisted: ""
       }, {
         default: withCtx(() => [
           withDirectives(createBaseVNode("div", {
-            id: _ctx.id,
+            id: __props.id,
             ref_key: "messageRef",
             ref: messageRef,
             class: normalizeClass([
               unref(ns4).b(),
-              { [unref(ns4).m(_ctx.type)]: _ctx.type },
-              unref(ns4).is("center", _ctx.center),
-              unref(ns4).is("closable", _ctx.showClose),
-              unref(ns4).is("plain", _ctx.plain),
-              _ctx.customClass
+              { [unref(ns4).m(__props.type)]: __props.type },
+              unref(ns4).is("center", __props.center),
+              unref(ns4).is("closable", __props.showClose),
+              unref(ns4).is("plain", __props.plain),
+              __props.customClass
             ]),
             style: normalizeStyle(customStyle.value),
             role: "alert",
             onMouseenter: clearTimer,
             onMouseleave: startTimer
           }, [
-            _ctx.repeatNum > 1 ? (openBlock(), createBlock(unref(VPBadge), {
+            __props.repeatNum > 1 ? (openBlock(), createBlock(unref(VPBadge), {
               key: 0,
-              text: _ctx.repeatNum,
+              text: __props.repeatNum,
               type: badgeType.value,
               class: normalizeClass(unref(ns4).e("badge"))
             }, null, 8, ["text", "type", "class"])) : createCommentVNode("v-if", true),
@@ -15164,22 +15278,22 @@ var _sfc_main15 = defineComponent({
               class: normalizeClass([unref(ns4).e("icon"), typeClass.value])
             }, null, 8, ["icon", "class"])) : createCommentVNode("v-if", true),
             renderSlot(_ctx.$slots, "default", {}, () => [
-              !_ctx.dangerouslyUseHTMLString ? (openBlock(), createElementBlock(
+              !__props.dangerouslyUseHTMLString ? (openBlock(), createElementBlock(
                 "p",
                 {
                   key: 0,
                   class: normalizeClass(unref(ns4).e("content"))
                 },
-                toDisplayString(_ctx.message),
+                toDisplayString(__props.message),
                 3
                 /* TEXT, CLASS */
               )) : (openBlock(), createElementBlock("p", {
                 key: 1,
                 class: normalizeClass(unref(ns4).e("content")),
-                innerHTML: _ctx.message
+                innerHTML: __props.message
               }, null, 10, _hoisted_27))
             ]),
-            _ctx.showClose ? (openBlock(), createBlock(unref(_sfc_main14), {
+            __props.showClose ? (openBlock(), createBlock(unref(_sfc_main14), {
               key: 2,
               icon: unref(closeIcon),
               class: normalizeClass(unref(ns4).e("closeBtn")),
@@ -15413,6 +15527,7 @@ var _sfc_main16 = defineComponent({
 
 // node_modules/vitepress-theme-teek/es/components/theme/LoginPage/src/login.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var getLoginStorageKey = () => {
   if (!isClient) return { siteLoginKey: "", pagesLoginKey: "", pageLoginKey: "", realmLoginKey: "" };
   const ns4 = useNamespace();
@@ -15865,8 +15980,9 @@ var useWatchLogin = () => {
           { username: frontmatter.value.username, password: frontmatter.value.password }
         ].filter((item) => ![void 0, ""].includes(item.username) && ![void 0, ""].includes(item.password));
         if (page.length) {
-          const path = "/" + newVal.data.relativePath.replace(".md", "");
-          if (isLogin(pageLoginKey + path, page, "page")) return;
+          const path = "/" + newVal.data.filePath.replace(".md", "");
+          const key = pageLoginKey + path;
+          if (isLogin(key, page, "page") || isLogin(`${key}.html`, page, "page")) return;
         }
         if (realm) {
           const goRealm = goLogin.replace("{verifyMode}", verifyModeMap.realm) + `&${realmKey}=${realm}`;
@@ -15888,6 +16004,7 @@ var useWatchLogin = () => {
 
 // node_modules/vitepress-theme-teek/es/components/theme/RiskLinkPage/src/index.vue2.mjs
 import { useData as useData11 } from "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var _hoisted_112 = ["src"];
 var _hoisted_29 = { key: 1 };
 var _sfc_main18 = defineComponent({
@@ -15981,6 +16098,7 @@ var _sfc_main18 = defineComponent({
 
 // node_modules/vitepress-theme-teek/es/components/theme/RiskLinkPage/src/useRiskLink.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var useRiskLink = (options = {}) => {
   const riskLinks = /* @__PURE__ */ new Set();
   const cleanups = [];
@@ -16028,9 +16146,11 @@ var useRiskLink = (options = {}) => {
 
 // node_modules/vitepress-theme-teek/es/components/theme/DemoCode/src/index.vue2.mjs
 import { useData as useData12 } from "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 
 // node_modules/vitepress-theme-teek/es/components/common/TransitionCollapse/src/index.vue2.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var _sfc_main19 = defineComponent({
   ...{ name: "TransitionCollapse" },
   __name: "index",
@@ -16328,13 +16448,16 @@ var music = `<svg class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http
 
 // node_modules/vitepress-theme-teek/es/components/theme/Layout/src/index.vue2.mjs
 import DefaultTheme from "vitepress/theme";
-import { useData as useData30, onContentUpdated as onContentUpdated2 } from "vitepress";
+import { useData as useData31, onContentUpdated as onContentUpdated3 } from "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 
 // node_modules/vitepress-theme-teek/es/components/theme/Home/src/index.vue2.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 
 // node_modules/vitepress-theme-teek/es/components/theme/HomeFullscreenWallpaper/src/index.vue2.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var _sfc_main21 = defineComponent({
   ...{ name: "HomeFullscreenWallpaper" },
   __name: "index",
@@ -16344,7 +16467,6 @@ var _sfc_main21 = defineComponent({
     const isFullscreen = ref(false);
     const wallpaperConfig = getTeekConfigRef("wallpaper", {
       hideBanner: false,
-      hideWaves: false,
       hideMask: false
     });
     const handleKeyDown = (event) => {
@@ -16366,22 +16488,23 @@ var _sfc_main21 = defineComponent({
     const handleFullscreenChange = () => {
       const htmlDom = document.documentElement;
       if (htmlDom.scrollTop !== 0) return;
-      const bannerCenterDom = document.querySelector(`.${ns4.join("banner__content")}`);
-      const bannerContentDom = document.querySelector(`.${ns4.join("bannerContent")}`);
-      const wavesDom = document.querySelector(`.${ns4.join("waves")}`);
-      const bodyBgImageMaskDom = document.querySelector(`.${ns4.join("bodyBgImage")} .mask`);
-      const bannerMaskDom = document.querySelector(`.${ns4.join("bannerBgImage")} .mask`);
+      const vpDocDom = document.querySelector(".vp-doc");
+      const bannerContentDom = document.querySelector(`.${ns4.join("banner__content")}`);
+      const wavesDom = document.querySelector(`.${ns4.join("banner-waves")}`);
+      const bodyBgImageMaskDom = document.querySelector(`.${ns4.join("body-bg-image")} .mask`);
+      const bannerMaskDom = document.querySelector(`.${ns4.join("banner-bg-image")} .mask`);
       isFullscreen.value = !!document.fullscreenElement;
-      const { hideBanner, hideWaves, hideMask } = wallpaperConfig.value;
+      const { hideBanner, hideMask } = wallpaperConfig.value;
       const options = [
         { el: htmlDom, executeClass: ns4.b() },
-        { el: bannerCenterDom, executeClass: "no-feature" },
+        { el: vpDocDom, executeClass: "display-none" },
+        { el: bannerContentDom, executeClass: "no-feature" },
         {
           el: bannerContentDom,
           executeClass: "display-none",
           execute: hideBanner
         },
-        { el: wavesDom, executeClass: "display-none", execute: hideWaves },
+        { el: wavesDom, executeClass: "display-none", execute: hideBanner },
         { el: bodyBgImageMaskDom, executeClass: "display-none", execute: hideMask },
         { el: bannerMaskDom, executeClass: "display-none", execute: hideMask }
       ];
@@ -16424,16 +16547,19 @@ var _sfc_main21 = defineComponent({
 });
 
 // node_modules/vitepress-theme-teek/es/components/theme/HomePostList/src/index.vue2.mjs
-import { useData as useData14, useRoute as useRoute2 } from "vitepress";
+import { useData as useData14, useRoute as useRoute3 } from "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 
 // node_modules/vitepress-theme-teek/es/components/common/Pagination/src/index.vue2.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 
 // node_modules/vitepress-theme-teek/es/components/common/Pagination/src/pagination.mjs
 var paginationKey = Symbol("paginationKey");
 
 // node_modules/vitepress-theme-teek/es/components/common/Pagination/src/components/prev.vue2.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var _hoisted_114 = ["disabled", "aria-label", "aria-disabled"];
 var _hoisted_211 = { key: 0 };
 var _sfc_main22 = defineComponent({
@@ -16455,19 +16581,19 @@ var _sfc_main22 = defineComponent({
         type: "button",
         class: "btn-prev",
         disabled: internalDisabled.value,
-        "aria-label": _ctx.prevText || unref(t)("tk.pagination.prev"),
+        "aria-label": __props.prevText || unref(t)("tk.pagination.prev"),
         "aria-disabled": internalDisabled.value,
         onClick: _cache[0] || (_cache[0] = ($event) => _ctx.$emit("click", $event))
       }, [
-        _ctx.prevText ? (openBlock(), createElementBlock(
+        __props.prevText ? (openBlock(), createElementBlock(
           "span",
           _hoisted_211,
-          toDisplayString(_ctx.prevText),
+          toDisplayString(__props.prevText),
           1
           /* TEXT */
-        )) : _ctx.prevIcon ? (openBlock(), createBlock(unref(_sfc_main14), {
+        )) : __props.prevIcon ? (openBlock(), createBlock(unref(_sfc_main14), {
           key: 1,
-          icon: _ctx.prevIcon
+          icon: __props.prevIcon
         }, null, 8, ["icon"])) : createCommentVNode("v-if", true)
       ], 8, _hoisted_114);
     };
@@ -16476,6 +16602,7 @@ var _sfc_main22 = defineComponent({
 
 // node_modules/vitepress-theme-teek/es/components/common/Pagination/src/components/next.vue2.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var _hoisted_115 = ["disabled", "aria-label", "aria-disabled"];
 var _hoisted_212 = { key: 0 };
 var _sfc_main23 = defineComponent({
@@ -16500,19 +16627,19 @@ var _sfc_main23 = defineComponent({
         type: "button",
         class: "btn-next",
         disabled: internalDisabled.value,
-        "aria-label": _ctx.nextText || unref(t)("tk.pagination.next"),
+        "aria-label": __props.nextText || unref(t)("tk.pagination.next"),
         "aria-disabled": internalDisabled.value,
         onClick: _cache[0] || (_cache[0] = ($event) => _ctx.$emit("click", $event))
       }, [
-        _ctx.nextText ? (openBlock(), createElementBlock(
+        __props.nextText ? (openBlock(), createElementBlock(
           "span",
           _hoisted_212,
-          toDisplayString(_ctx.nextText),
+          toDisplayString(__props.nextText),
           1
           /* TEXT */
-        )) : _ctx.nextIcon ? (openBlock(), createBlock(unref(_sfc_main14), {
+        )) : __props.nextIcon ? (openBlock(), createBlock(unref(_sfc_main14), {
           key: 1,
-          icon: _ctx.nextIcon
+          icon: __props.nextIcon
         }, null, 8, ["icon"])) : createCommentVNode("v-if", true)
       ], 8, _hoisted_115);
     };
@@ -16521,6 +16648,7 @@ var _sfc_main23 = defineComponent({
 
 // node_modules/vitepress-theme-teek/es/components/common/Pagination/src/components/jumper.vue2.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 
 // node_modules/vitepress-theme-teek/es/components/common/Pagination/src/usePagination.mjs
 var usePagination = () => inject(paginationKey, {});
@@ -16568,7 +16696,7 @@ var _sfc_main24 = defineComponent({
           disabled: unref(disabled),
           onChange: handleChange,
           "aria-label": unref(t)("tk.pagination.page"),
-          class: normalizeClass([unref(ns4).e("input"), unref(ns4).em("input", _ctx.size)])
+          class: normalizeClass([unref(ns4).e("input"), unref(ns4).em("input", __props.size)])
         }, null, 42, _hoisted_213), [
           [vModelText, userInput.value]
         ]),
@@ -16588,6 +16716,7 @@ var _sfc_main24 = defineComponent({
 
 // node_modules/vitepress-theme-teek/es/components/common/Pagination/src/components/total.vue2.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var _hoisted_117 = ["disabled"];
 var _sfc_main25 = defineComponent({
   ...{ name: "PaginationTotal" },
@@ -16604,7 +16733,7 @@ var _sfc_main25 = defineComponent({
         class: normalizeClass(unref(ns4).e("total")),
         disabled: unref(disabled)
       }, toDisplayString(unref(t)("tk.pagination.total", {
-        total: _ctx.total
+        total: __props.total
       })), 11, _hoisted_117);
     };
   }
@@ -16612,6 +16741,7 @@ var _sfc_main25 = defineComponent({
 
 // node_modules/vitepress-theme-teek/es/components/common/Pagination/src/components/pager.vue2.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var _hoisted_118 = ["aria-current", "aria-label", "tabindex"];
 var _hoisted_214 = ["tabindex", "aria-label"];
 var _hoisted_37 = ["innerHTML"];
@@ -16732,10 +16862,10 @@ var _sfc_main26 = defineComponent({
           onKeyup: withKeys(onEnter, ["enter"])
         },
         [
-          _ctx.pageCount > 0 ? (openBlock(), createElementBlock("li", {
+          __props.pageCount > 0 ? (openBlock(), createElementBlock("li", {
             key: 0,
-            class: normalizeClass([[unref(nsPager).is("active", _ctx.currentPage === 1), unref(nsPager).is("disabled", _ctx.disabled)], "number"]),
-            "aria-current": _ctx.currentPage === 1,
+            class: normalizeClass([[unref(nsPager).is("active", __props.currentPage === 1), unref(nsPager).is("disabled", __props.disabled)], "number"]),
+            "aria-current": __props.currentPage === 1,
             "aria-label": unref(t)("tk.pagination.currentPage", { pager: 1 }),
             tabindex: tabindex.value
           }, " 1 ", 10, _hoisted_118)) : createCommentVNode("v-if", true),
@@ -16743,13 +16873,13 @@ var _sfc_main26 = defineComponent({
             key: 1,
             class: normalizeClass(prevMoreKls.value),
             tabindex: tabindex.value,
-            "aria-label": unref(t)("tk.pagination.prevPages", { pager: _ctx.pagerCount - 2 }),
+            "aria-label": unref(t)("tk.pagination.prevPages", { pager: __props.pagerCount - 2 }),
             onMouseenter: _cache[0] || (_cache[0] = ($event) => onMouseEnter(true)),
             onMouseleave: _cache[1] || (_cache[1] = ($event) => quickPrevHover.value = false),
             onFocus: _cache[2] || (_cache[2] = ($event) => onFocus(true)),
             onBlur: _cache[3] || (_cache[3] = ($event) => quickPrevFocus.value = false)
           }, [
-            (quickPrevHover.value || quickPrevFocus.value) && !_ctx.disabled ? (openBlock(), createElementBlock("span", {
+            (quickPrevHover.value || quickPrevFocus.value) && !__props.disabled ? (openBlock(), createElementBlock("span", {
               key: 0,
               innerHTML: unref(dArrowLeftIcon)
             }, null, 8, _hoisted_37)) : (openBlock(), createElementBlock("span", {
@@ -16763,8 +16893,8 @@ var _sfc_main26 = defineComponent({
             renderList(pagers.value, (pager) => {
               return openBlock(), createElementBlock("li", {
                 key: pager,
-                class: normalizeClass([[unref(nsPager).is("active", _ctx.currentPage === pager), unref(nsPager).is("disabled", _ctx.disabled)], "number"]),
-                "aria-current": _ctx.currentPage === pager,
+                class: normalizeClass([[unref(nsPager).is("active", __props.currentPage === pager), unref(nsPager).is("disabled", __props.disabled)], "number"]),
+                "aria-current": __props.currentPage === pager,
                 "aria-label": unref(t)("el.pagination.currentPage", { pager }),
                 tabindex: tabindex.value
               }, toDisplayString(pager), 11, _hoisted_56);
@@ -16776,13 +16906,13 @@ var _sfc_main26 = defineComponent({
             key: 2,
             class: normalizeClass(nextMoreKls.value),
             tabindex: tabindex.value,
-            "aria-label": unref(t)("tk.pagination.nextPages", { pager: _ctx.pagerCount - 2 }),
+            "aria-label": unref(t)("tk.pagination.nextPages", { pager: __props.pagerCount - 2 }),
             onMouseenter: _cache[4] || (_cache[4] = ($event) => onMouseEnter()),
             onMouseleave: _cache[5] || (_cache[5] = ($event) => quickNextHover.value = false),
             onFocus: _cache[6] || (_cache[6] = ($event) => onFocus()),
             onBlur: _cache[7] || (_cache[7] = ($event) => quickNextFocus.value = false)
           }, [
-            (quickNextHover.value || quickNextFocus.value) && !_ctx.disabled ? (openBlock(), createElementBlock("span", {
+            (quickNextHover.value || quickNextFocus.value) && !__props.disabled ? (openBlock(), createElementBlock("span", {
               key: 0,
               innerHTML: unref(dArrowRightIcon)
             }, null, 8, _hoisted_74)) : (openBlock(), createElementBlock("span", {
@@ -16790,13 +16920,13 @@ var _sfc_main26 = defineComponent({
               innerHTML: unref(moreFilledIcon)
             }, null, 8, _hoisted_83))
           ], 42, _hoisted_65)) : createCommentVNode("v-if", true),
-          _ctx.pageCount > 1 ? (openBlock(), createElementBlock("li", {
+          __props.pageCount > 1 ? (openBlock(), createElementBlock("li", {
             key: 3,
-            class: normalizeClass([[unref(nsPager).is("active", _ctx.currentPage === _ctx.pageCount), unref(nsPager).is("disabled", _ctx.disabled)], "number"]),
-            "aria-current": _ctx.currentPage === _ctx.pageCount,
-            "aria-label": unref(t)("tk.pagination.currentPage", { pager: _ctx.pageCount }),
+            class: normalizeClass([[unref(nsPager).is("active", __props.currentPage === __props.pageCount), unref(nsPager).is("disabled", __props.disabled)], "number"]),
+            "aria-current": __props.currentPage === __props.pageCount,
+            "aria-label": unref(t)("tk.pagination.currentPage", { pager: __props.pageCount }),
             tabindex: tabindex.value
-          }, toDisplayString(_ctx.pageCount), 11, _hoisted_92)) : createCommentVNode("v-if", true)
+          }, toDisplayString(__props.pageCount), 11, _hoisted_92)) : createCommentVNode("v-if", true)
         ],
         34
         /* CLASS, NEED_HYDRATION */
@@ -16950,7 +17080,7 @@ var _sfc_main27 = defineComponent({
       return openBlock(), createElementBlock(
         "div",
         {
-          class: normalizeClass([unref(ns4).b(), unref(ns4).is("background", _ctx.background), unref(ns4).m(_ctx.size)])
+          class: normalizeClass([unref(ns4).b(), unref(ns4).is("background", __props.background), unref(ns4).m(__props.size)])
         },
         [
           (openBlock(true), createElementBlock(
@@ -16975,9 +17105,11 @@ var pageNumKey = "pageNum";
 
 // node_modules/vitepress-theme-teek/es/components/theme/HomePostList/src/HomePostItem.vue2.mjs
 import { withBase as withBase7 } from "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 
 // node_modules/vitepress-theme-teek/es/components/theme/ArticleInfo/src/index.vue2.mjs
-import { useData as useData13, useRoute, withBase as withBase6 } from "vitepress";
+import { useData as useData13, useRoute as useRoute2, withBase as withBase6 } from "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var _hoisted_119 = ["aria-label"];
 var _hoisted_215 = ["aria-label"];
 var _hoisted_38 = ["title", "href", "target", "aria-label"];
@@ -17005,7 +17137,7 @@ var _sfc_main28 = defineComponent({
       showTag: false
     });
     const posts = usePosts();
-    const route = useRoute();
+    const route = useRoute2();
     const createDate = computed(() => {
       var _a;
       const originPosts = posts.value.originPosts;
@@ -17043,7 +17175,7 @@ var _sfc_main28 = defineComponent({
           title: t("tk.articleInfo.updateTime"),
           icon: editPenIcon,
           data: updateDate.value,
-          show: updateDate.value && __props.scope === "article" && showUpdateDate
+          show: updateDate.value && (__props.scope === "article" && showUpdateDate || __props.scope === "article-banner")
         },
         {
           title: t("tk.articleInfo.category"),
@@ -17051,7 +17183,7 @@ var _sfc_main28 = defineComponent({
           dataList: ((_d = __props.post.frontmatter) == null ? void 0 : _d.categories) || [],
           href: "/categories?category={data}",
           class: "or",
-          show: __props.scope === "post" || isShow(showCategory)
+          show: __props.scope !== "article-banner" && (__props.scope === "post" || isShow(showCategory))
         },
         {
           title: t("tk.articleInfo.tag"),
@@ -17059,7 +17191,7 @@ var _sfc_main28 = defineComponent({
           dataList: ((_e = __props.post.frontmatter) == null ? void 0 : _e.tags) || [],
           href: "/tags?tag={data}",
           class: "or",
-          show: __props.scope === "post" || isShow(showTag)
+          show: __props.scope !== "article-banner" && (__props.scope === "post" || isShow(showTag))
         }
       ];
     });
@@ -17069,7 +17201,7 @@ var _sfc_main28 = defineComponent({
     };
     return (_ctx, _cache) => {
       return openBlock(), createElementBlock("div", {
-        class: normalizeClass([unref(ns4).b(), _ctx.scope]),
+        class: normalizeClass([unref(ns4).b(), __props.scope]),
         role: "group",
         "aria-label": unref(t)("tk.articleInfo.label")
       }, [
@@ -17086,7 +17218,7 @@ var _sfc_main28 = defineComponent({
               [
                 item.show && (item.data || ((_a = item.dataList) == null ? void 0 : _a.length)) ? (openBlock(), createElementBlock("span", {
                   key: 0,
-                  class: normalizeClass([unref(ns4).e("item"), { split: _ctx.split }]),
+                  class: normalizeClass([unref(ns4).e("item"), { split: __props.split }]),
                   role: "group",
                   "aria-label": item.title
                 }, [
@@ -17174,18 +17306,18 @@ var _sfc_main29 = defineComponent({
     );
     const imgSrcList = computed(() => [__props.post.frontmatter.coverImg || postConfig.value.defaultCoverImg || []].flat());
     const coverImgMap = computed(() => {
-      const imgSrcListConst = imgSrcList.value;
+      const imgSrc = imgSrcList.value[Math.floor(Math.random() * imgSrcList.value.length)];
       return {
         default: {
           is: "div",
           props: {
-            style: `background-image: url(${withBase7(imgSrcListConst[0])});`
+            style: `background-image: url(${withBase7(imgSrc)});`
           }
         },
         full: {
           is: "img",
           props: {
-            src: withBase7(imgSrcListConst[0])
+            src: withBase7(imgSrc)
           }
         }
       };
@@ -17201,10 +17333,10 @@ var _sfc_main29 = defineComponent({
           class: normalizeClass(unref(ns4).b())
         },
         [
-          !!_ctx.post.frontmatter.sticky ? (openBlock(), createElementBlock("i", {
+          !!__props.post.frontmatter.sticky ? (openBlock(), createElementBlock("i", {
             key: 0,
             class: "pin",
-            title: unref(t)("tk.homePost.pin", { sticky: _ctx.post.frontmatter.sticky }),
+            title: unref(t)("tk.homePost.pin", { sticky: __props.post.frontmatter.sticky }),
             "aria-label": unref(t)("tk.homePost.pinLabel")
           }, null, 8, _hoisted_120)) : createCommentVNode("v-if", true),
           createBaseVNode("div", _hoisted_216, [
@@ -17218,10 +17350,10 @@ var _sfc_main29 = defineComponent({
                 createBaseVNode("a", {
                   class: normalizeClass([unref(ns4).e("left__title"), "hover-color", "sle"]),
                   href: unref(postUrl),
-                  "aria-label": _ctx.post.title
+                  "aria-label": __props.post.title
                 }, [
                   createVNode(unref(_sfc_main7), {
-                    post: _ctx.post,
+                    post: __props.post,
                     "title-tag-props": { position: unref(postConfig).listStyleTitleTagPosition }
                   }, null, 8, ["post", "title-tag-props"])
                 ], 10, _hoisted_39),
@@ -17249,7 +17381,7 @@ var _sfc_main29 = defineComponent({
                 }, [
                   isShowInfo.value ? (openBlock(), createBlock(unref(_sfc_main28), {
                     key: 0,
-                    post: _ctx.post,
+                    post: __props.post,
                     scope: "post",
                     split: unref(postConfig).splitSeparator
                   }, null, 8, ["post", "split"])) : createCommentVNode("v-if", true)
@@ -17285,12 +17417,12 @@ var _sfc_main29 = defineComponent({
                 imgSrcList.value.length ? (openBlock(), createElementBlock("a", {
                   key: 0,
                   href: unref(postUrl),
-                  class: normalizeClass(`${_ctx.coverImgMode} cover`),
+                  class: normalizeClass(`${__props.coverImgMode} cover`),
                   "aria-label": unref(t)("tk.homePost.coverImgLabel")
                 }, [
                   (openBlock(), createBlock(
-                    resolveDynamicComponent(coverImgMap.value[_ctx.coverImgMode].is),
-                    mergeProps(coverImgMap.value[_ctx.coverImgMode].props, {
+                    resolveDynamicComponent(coverImgMap.value[__props.coverImgMode].is),
+                    mergeProps(coverImgMap.value[__props.coverImgMode].props, {
                       "aria-hidden": "true",
                       class: "cover-img"
                     }),
@@ -17314,6 +17446,7 @@ var _sfc_main29 = defineComponent({
 
 // node_modules/vitepress-theme-teek/es/components/theme/HomePostList/src/HomePostItemCard.vue2.mjs
 import { withBase as withBase8 } from "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var _hoisted_121 = ["href", "alt"];
 var _hoisted_217 = ["src"];
 var _hoisted_310 = ["href", "aria-label"];
@@ -17351,12 +17484,12 @@ var _sfc_main30 = defineComponent({
           class: normalizeClass(unref(ns4).b())
         },
         [
-          !!_ctx.post.frontmatter.sticky ? (openBlock(), createBlock(unref(_sfc_main14), {
+          !!__props.post.frontmatter.sticky ? (openBlock(), createBlock(unref(_sfc_main14), {
             key: 0,
             icon: unref(topIcon),
             class: "top",
             size: 40,
-            title: unref(t)("tk.homePost.pin", { sticky: _ctx.post.frontmatter.sticky }),
+            title: unref(t)("tk.homePost.pin", { sticky: __props.post.frontmatter.sticky }),
             "aria-label": unref(t)("tk.homePost.pinLabel")
           }, null, 8, ["icon", "title", "aria-label"])) : createCommentVNode("v-if", true),
           imgSrcList.value.length ? (openBlock(), createElementBlock(
@@ -17368,7 +17501,7 @@ var _sfc_main30 = defineComponent({
             [
               createBaseVNode("a", {
                 href: unref(postUrl),
-                alt: _ctx.post.title
+                alt: __props.post.title
               }, [
                 createBaseVNode("img", {
                   src: unref(withBase8)(imgSrcList.value[0]),
@@ -17388,10 +17521,10 @@ var _sfc_main30 = defineComponent({
               createBaseVNode("a", {
                 class: "title hover-color, sle",
                 href: unref(postUrl),
-                "aria-label": _ctx.post.title
+                "aria-label": __props.post.title
               }, [
                 createVNode(unref(_sfc_main7), {
-                  post: _ctx.post,
+                  post: __props.post,
                   "title-tag-props": { position: unref(postConfig).cardStyleTitleTagPosition }
                 }, null, 8, ["post", "title-tag-props"])
               ], 8, _hoisted_310),
@@ -17403,7 +17536,7 @@ var _sfc_main30 = defineComponent({
               }, null, 8, _hoisted_49)) : createCommentVNode("v-if", true),
               isShowInfo.value ? (openBlock(), createBlock(unref(_sfc_main28), {
                 key: 1,
-                post: _ctx.post,
+                post: __props.post,
                 scope: "post",
                 split: unref(postConfig).splitSeparator,
                 "aria-label": unref(t)("tk.homePost.infoLabel")
@@ -17447,15 +17580,18 @@ var _sfc_main31 = defineComponent({
       transitionName: ns4.join("slide-fade")
     });
     const pageConfig = getTeekConfigRef("page", {});
-    const coverImgMode = ref(postConfig.value.coverImgMode);
     const pageNum = ref(1);
     const total = ref(0);
+    const coverImgMode = ref(postConfig.value.coverImgMode);
     const isPaging = useModel(__props, "modelValue");
     const defaultPageSize = computed(() => postConfig.value.postStyle === "list" ? 10 : 15);
     const pageSize = computed(() => pageConfig.value.pageSize || defaultPageSize.value);
-    const route = useRoute2();
+    const route = useRoute3();
     const currentPosts = ref([]);
     const totalPostsCount = ref(0);
+    watchEffect(() => {
+      coverImgMode.value = postConfig.value.coverImgMode;
+    });
     const updateData = () => {
       if (!isClient) return;
       const { searchParams } = new URL(window.location.href);
@@ -17477,13 +17613,7 @@ var _sfc_main31 = defineComponent({
       totalPostsCount.value = inHomePosts.length;
       currentPosts.value = inHomePosts.slice((pageNum.value - 1) * pageSize.value, pageNum.value * pageSize.value);
     };
-    watch(
-      route,
-      () => {
-        updateData();
-      },
-      { immediate: true }
-    );
+    watch(() => route.path, updateData, { immediate: true });
     const handlePagination = () => {
       const { searchParams } = new URL(window.location.href);
       searchParams.delete(pageNumKey);
@@ -17511,7 +17641,7 @@ var _sfc_main31 = defineComponent({
       } else if (coverImgMode.value !== postConfig.value.coverImgMode) coverImgMode.value = postConfig.value.coverImgMode;
     });
     const windowTransition = useWindowTransitionConfig((config) => config.post);
-    const postItemListInstance = useTemplateRef("postItemListInstance");
+    const postItemListInstance = ref(null);
     const { start } = useWindowTransition(postItemListInstance, false);
     onMounted(() => {
       windowTransition.value && start();
@@ -17552,7 +17682,8 @@ var _sfc_main31 = defineComponent({
                                 key: 0,
                                 ref_for: true,
                                 ref_key: "postItemListInstance",
-                                ref: postItemListInstance
+                                ref: postItemListInstance,
+                                style: { "width": "100%", "height": "100%" }
                               },
                               [
                                 unref(postConfig).postStyle === "card" ? (openBlock(), createBlock(_sfc_main30, {
@@ -17644,9 +17775,11 @@ var _sfc_main31 = defineComponent({
 
 // node_modules/vitepress-theme-teek/es/components/theme/HomeBanner/src/index.vue2.mjs
 import { useData as useData17 } from "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 
 // node_modules/vitepress-theme-teek/es/components/theme/HomeBanner/src/HomeBannerBgPure.vue2.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var _hoisted_123 = ["aria-label"];
 var _sfc_main32 = defineComponent({
   ...{ name: "HomeBannerBgPure" },
@@ -17673,6 +17806,7 @@ var _sfc_main32 = defineComponent({
 
 // node_modules/vitepress-theme-teek/es/components/theme/HomeBanner/src/HomeBannerBgImage.vue2.mjs
 import { withBase as withBase9 } from "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var _hoisted_124 = ["aria-label"];
 var _hoisted_219 = ["aria-label"];
 var _sfc_main33 = defineComponent({
@@ -17692,7 +17826,10 @@ var _sfc_main33 = defineComponent({
     });
     const isPartImgBgStyle = computed(() => bannerConfig.value.bgStyle === "partImg");
     const isFullImgBgStyle = computed(() => bannerConfig.value.bgStyle === "fullImg");
-    const dataArray = computed(() => [bannerConfig.value.imgSrc || []].flat().map((item) => item && withBase9(item)));
+    const dataArray = computed(() => {
+      const imgSrc = bannerConfig.value.imgSrc;
+      return [isFunction(imgSrc) ? imgSrc() : imgSrc || []].flat().map((item) => item && withBase9(item));
+    });
     const {
       data: imageSrc,
       start,
@@ -17752,6 +17889,7 @@ var _sfc_main33 = defineComponent({
 
 // node_modules/vitepress-theme-teek/es/components/theme/HomeBanner/src/HomeBannerContent.vue2.mjs
 import { useData as useData15 } from "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var _hoisted_125 = ["aria-label"];
 var _hoisted_220 = ["aria-label"];
 var _hoisted_311 = ["aria-label"];
@@ -17842,31 +17980,23 @@ var _sfc_main34 = defineComponent({
             toDisplayString(descArray.value[0]),
             1
             /* TEXT */
-          )) : isSwitchDescStyle.value ? (openBlock(), createElementBlock(
-            Fragment,
-            { key: 1 },
-            [
-              withDirectives(createBaseVNode("span", {
+          )) : isSwitchDescStyle.value ? (openBlock(), createBlock(Transition, {
+            key: 1,
+            name: unref(ns4).join("fade"),
+            mode: "out-in"
+          }, {
+            default: withCtx(() => [
+              (openBlock(), createElementBlock("span", {
+                key: unref(text) || descArray.value[0],
                 onClick: _cache[0] || (_cache[0] = //@ts-ignore
                 (...args) => unref(startAutoSwitch) && unref(startAutoSwitch)(...args)),
                 class: "switch",
                 "aria-label": unref(t)("tk.homeBanner.descSwitchLabel")
-              }, toDisplayString(unref(text)), 9, _hoisted_58), [
-                [vShow, unref(text)]
-              ]),
-              withDirectives(createBaseVNode(
-                "span",
-                null,
-                " ",
-                512
-                /* NEED_PATCH */
-              ), [
-                [vShow, !unref(text)]
-              ])
-            ],
-            64
-            /* STABLE_FRAGMENT */
-          )) : isTypesDescStyle.value && descArray.value.length ? (openBlock(), createElementBlock(
+              }, toDisplayString(unref(text) || descArray.value[0]), 9, _hoisted_58))
+            ]),
+            _: 1
+            /* STABLE */
+          }, 8, ["name"])) : isTypesDescStyle.value && descArray.value.length ? (openBlock(), createElementBlock(
             Fragment,
             { key: 2 },
             [
@@ -17894,6 +18024,7 @@ var _sfc_main34 = defineComponent({
 
 // node_modules/vitepress-theme-teek/es/components/theme/HomeBanner/src/HomeBannerFeature.vue2.mjs
 import { useData as useData16, withBase as withBase10 } from "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var _hoisted_126 = ["aria-labelledby"];
 var _hoisted_221 = ["src", "alt", "aria-label"];
 var _hoisted_312 = ["id"];
@@ -18002,6 +18133,7 @@ var _sfc_main35 = defineComponent({
 
 // node_modules/vitepress-theme-teek/es/components/theme/HomeBanner/src/HomeBannerWaves.vue2.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var _sfc_main36 = defineComponent({
   ...{ name: "HomeBannerWaves" },
   __name: "HomeBannerWaves",
@@ -18030,7 +18162,7 @@ var _sfc_main36 = defineComponent({
               })
             ],
             -1
-            /* HOISTED */
+            /* CACHED */
           )),
           createCommentVNode("组合波浪"),
           _cache[1] || (_cache[1] = createStaticVNode('<g class="parallax"><use class="use" xlink:href="#gentle-wave" x="48" y="0"></use><use class="use dark:fill-black" xlink:href="#gentle-wave" x="48" y="3"></use><use class="use dark:fill-black" xlink:href="#gentle-wave" x="48" y="5"></use><use class="use dark:fill-black" xlink:href="#gentle-wave" x="48" y="7"></use></g>', 1))
@@ -18114,7 +18246,7 @@ var _sfc_main37 = defineComponent({
       () => toggleFullImgNavBarClass(!__props.disabled)
     );
     onMounted(() => {
-      if (currentBgStyle.value.isBannerFullImgBgStyle || currentBgStyle.value.isBodyFullImgBgStyle) {
+      if (!__props.disabled && currentBgStyle.value.isBannerFullImgBgStyle || currentBgStyle.value.isBodyFullImgBgStyle) {
         toggleClass();
         useEventListener(window, "scroll", toggleClass);
       }
@@ -18226,12 +18358,15 @@ var _sfc_main37 = defineComponent({
 
 // node_modules/vitepress-theme-teek/es/components/theme/HomeCardList/src/index.vue2.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 
 // node_modules/vitepress-theme-teek/es/components/theme/HomeMyCard/src/index.vue2.mjs
 import { withBase as withBase12 } from "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 
 // node_modules/vitepress-theme-teek/es/components/common/PageCard/src/index.vue2.mjs
 import { withBase as withBase11 } from "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var _hoisted_128 = ["aria-label"];
 var _hoisted_222 = ["href", "target", "aria-label"];
 var _hoisted_313 = ["innerHTML"];
@@ -18306,7 +18441,7 @@ var _sfc_main38 = defineComponent({
         class: normalizeClass(`${unref(ns4).b()} card`),
         "aria-label": unref(t)("tk.pageCard.label")
       }, [
-        _ctx.title ? (openBlock(), createElementBlock(
+        __props.title ? (openBlock(), createElementBlock(
           "div",
           {
             key: 0,
@@ -18314,34 +18449,34 @@ var _sfc_main38 = defineComponent({
           },
           [
             renderSlot(_ctx.$slots, "title", {}, () => [
-              _ctx.titleLink ? (openBlock(), createElementBlock("a", {
+              __props.titleLink ? (openBlock(), createElementBlock("a", {
                 key: 0,
-                href: unref(withBase11)(_ctx.titleLink),
-                target: unref(isValidURL)(_ctx.titleLink) ? "_blank" : "_self",
-                "aria-label": removeHtmlTag(_ctx.title)
+                href: unref(withBase11)(__props.titleLink),
+                target: unref(isValidURL)(__props.titleLink) ? "_blank" : "_self",
+                "aria-label": removeHtmlTag(__props.title)
               }, [
                 createBaseVNode("span", {
                   class: "title flx-align-center",
-                  innerHTML: _ctx.title
+                  innerHTML: __props.title
                 }, null, 8, _hoisted_313)
-              ], 8, _hoisted_222)) : _ctx.titleClick ? (openBlock(), createElementBlock("a", {
+              ], 8, _hoisted_222)) : __props.titleClick ? (openBlock(), createElementBlock("a", {
                 key: 1,
-                onClick: _cache[0] || (_cache[0] = () => _ctx.titleClick()),
+                onClick: _cache[0] || (_cache[0] = () => __props.titleClick()),
                 class: normalizeClass(unref(pointClass)),
-                "aria-label": removeHtmlTag(_ctx.title)
+                "aria-label": removeHtmlTag(__props.title)
               }, [
                 createBaseVNode("span", {
                   class: "title flx-align-center",
-                  innerHTML: _ctx.title
+                  innerHTML: __props.title
                 }, null, 8, _hoisted_59)
               ], 10, _hoisted_412)) : (openBlock(), createElementBlock("span", {
                 key: 2,
                 class: "title flx-align-center",
-                innerHTML: _ctx.title
+                innerHTML: __props.title
               }, null, 8, _hoisted_68))
             ]),
             renderSlot(_ctx.$slots, "page", normalizeProps(guardReactiveProps({ pagination })), () => [
-              _ctx.page ? (openBlock(), createElementBlock("div", _hoisted_76, [
+              __props.page ? (openBlock(), createElementBlock("div", _hoisted_76, [
                 renderSlot(_ctx.$slots, "page-left", normalizeProps(guardReactiveProps({ pagination })), () => [
                   createBaseVNode("span", {
                     class: normalizeClass(["page-button", unref(hasNextData) ? unref(pointClass) : "disabled"]),
@@ -18386,6 +18521,7 @@ var _sfc_main38 = defineComponent({
 
 // node_modules/vitepress-theme-teek/es/components/common/Avatar/src/index.vue2.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var _hoisted_129 = ["src", "alt", "srcSet"];
 var _hoisted_223 = { key: 2 };
 var _sfc_main39 = defineComponent({
@@ -18453,20 +18589,20 @@ var _sfc_main39 = defineComponent({
           style: normalizeStyle(avatarStyle.value)
         },
         [
-          (_ctx.src || _ctx.srcSet) && !hasLoadError.value ? (openBlock(), createElementBlock("img", {
+          (__props.src || __props.srcSet) && !hasLoadError.value ? (openBlock(), createElementBlock("img", {
             key: 0,
-            src: _ctx.src,
-            alt: _ctx.alt,
-            srcSet: _ctx.srcSet,
+            src: __props.src,
+            alt: __props.alt,
+            srcSet: __props.srcSet,
             style: normalizeStyle(imgStyle.value),
             onError: handleError
-          }, null, 44, _hoisted_129)) : _ctx.icon ? (openBlock(), createBlock(unref(_sfc_main14), {
+          }, null, 44, _hoisted_129)) : __props.icon ? (openBlock(), createBlock(unref(_sfc_main14), {
             key: 1,
-            icon: _ctx.icon
-          }, null, 8, ["icon"])) : _ctx.text ? (openBlock(), createElementBlock(
+            icon: __props.icon
+          }, null, 8, ["icon"])) : __props.text ? (openBlock(), createElementBlock(
             "span",
             _hoisted_223,
-            toDisplayString(captureText(_ctx.text)),
+            toDisplayString(captureText(__props.text)),
             1
             /* TEXT */
           )) : renderSlot(_ctx.$slots, "default", { key: 3 })
@@ -18491,131 +18627,144 @@ var _sfc_main40 = defineComponent({
     const ns4 = useNamespace("my");
     const { t } = useLocale();
     const { getTeekConfigRef } = useTeekConfig();
-    const blogger = getTeekConfigRef("blogger", { shape: "square", circleBgMask: true });
-    const social = getTeekConfigRef("social", []);
-    const shape = computed(() => blogger.value.shape.replace(/-.*$/, ""));
-    const isCircleBgImg = computed(() => shape.value === "circle" && !!blogger.value.circleBgImg);
-    const avatarBgStyle = computed(() => ({ backgroundImage: `url(${withBase12(blogger.value.circleBgImg)})` }));
-    const myCardColorStyle = computed(() => ({ color: blogger.value.color }));
+    const bloggerConfig = getTeekConfigRef("blogger", { shape: "square", circleBgMask: true });
+    const socialConfig = getTeekConfigRef("social", []);
+    const shape = computed(() => bloggerConfig.value.shape.replace(/-.*$/, ""));
+    const isCircleBgImg = computed(() => shape.value === "circle" && !!bloggerConfig.value.circleBgImg);
+    const avatarBgStyle = computed(() => ({ backgroundImage: `url(${withBase12(bloggerConfig.value.circleBgImg)})` }));
+    const myCardColorStyle = computed(() => ({ color: bloggerConfig.value.color }));
+    const isSrc = computed(() => {
+      var _a;
+      const icon = (_a = bloggerConfig.value.status) == null ? void 0 : _a.icon;
+      if (!icon) return false;
+      return isValidURL(icon) || icon.startsWith("/");
+    });
     return (_ctx, _cache) => {
-      return openBlock(), createElementBlock(
-        Fragment,
-        null,
-        [
-          renderSlot(_ctx.$slots, "teek-home-card-my-before"),
-          renderSlot(_ctx.$slots, "teek-home-card-my", {}, () => [
-            unref(blogger).name ? (openBlock(), createBlock(unref(_sfc_main38), {
-              key: 0,
-              class: normalizeClass([unref(ns4).b(), unref(ns4).is("circle-bg", isCircleBgImg.value)]),
-              style: normalizeStyle(myCardColorStyle.value),
-              "aria-label": unref(t)("tk.myCard.label")
-            }, {
-              default: withCtx(() => [
-                isCircleBgImg.value ? (openBlock(), createElementBlock(
-                  "div",
-                  {
+      return unref(bloggerConfig).name ? (openBlock(), createBlock(unref(_sfc_main38), {
+        key: 0,
+        class: normalizeClass([unref(ns4).b(), unref(ns4).is("circle-bg", isCircleBgImg.value)]),
+        style: normalizeStyle(myCardColorStyle.value),
+        "aria-label": unref(t)("tk.myCard.label")
+      }, {
+        default: withCtx(() => {
+          var _a, _b;
+          return [
+            isCircleBgImg.value ? (openBlock(), createElementBlock(
+              "div",
+              {
+                key: 0,
+                class: normalizeClass([unref(ns4).em("avatar__circle", "bg"), unref(ns4).is("mask", unref(bloggerConfig).circleBgMask)]),
+                style: normalizeStyle(avatarBgStyle.value)
+              },
+              null,
+              6
+              /* CLASS, STYLE */
+            )) : createCommentVNode("v-if", true),
+            createBaseVNode(
+              "div",
+              {
+                class: normalizeClass(`${unref(ns4).e("avatar")} ${unref(bloggerConfig).shape} flx-center`)
+              },
+              [
+                createBaseVNode("div", null, [
+                  unref(bloggerConfig).avatar ? (openBlock(), createBlock(unref(_sfc_main39), {
                     key: 0,
-                    class: normalizeClass([unref(ns4).em("avatar__circle", "bg"), unref(ns4).is("mask", unref(blogger).circleBgMask)]),
-                    style: normalizeStyle(avatarBgStyle.value)
-                  },
-                  null,
-                  6
-                  /* CLASS, STYLE */
-                )) : createCommentVNode("v-if", true),
-                createBaseVNode(
-                  "div",
-                  {
-                    class: normalizeClass(`${unref(ns4).e("avatar")} ${unref(blogger).shape} flx-center`)
-                  },
-                  [
-                    unref(blogger).avatar ? (openBlock(), createBlock(unref(_sfc_main39), {
+                    src: unref(withBase12)(unref(bloggerConfig).avatar),
+                    size: unref(bloggerConfig).shape === "square" ? "100%" : unref(bloggerConfig).circleSize ?? 100,
+                    shape: shape.value,
+                    "bg-color": "transparent",
+                    alt: unref(t)("tk.myCard.avatarAlt"),
+                    title: unref(t)("tk.myCard.avatarTitle"),
+                    "aria-hidden": "true"
+                  }, null, 8, ["src", "size", "shape", "alt", "title"])) : (openBlock(), createBlock(unref(_sfc_main39), {
+                    key: 1,
+                    size: unref(bloggerConfig).circleSize ?? 100,
+                    shape: shape.value,
+                    text: unref(bloggerConfig).name,
+                    "text-size": 50,
+                    "bg-color": unref(ns4).cssVar("theme-color"),
+                    "aria-hidden": "true"
+                  }, null, 8, ["size", "shape", "text", "bg-color"])),
+                  ((_a = unref(bloggerConfig).status) == null ? void 0 : _a.icon) && ((_b = shape.value) == null ? void 0 : _b.startsWith("circle")) ? (openBlock(), createBlock(unref(_sfc_main39), {
+                    key: 2,
+                    src: isSrc.value ? unref(bloggerConfig).status.icon : "",
+                    text: unref(bloggerConfig).status.icon,
+                    size: unref(bloggerConfig).status.size ?? 26,
+                    "icon-size": unref(bloggerConfig).status.size ?? 26,
+                    "text-size": unref(bloggerConfig).status.size ?? 26,
+                    title: unref(bloggerConfig).status.title,
+                    circle: "",
+                    "bg-color": "transparent",
+                    class: "avatar-sticker",
+                    "aria-hidden": "true"
+                  }, null, 8, ["src", "text", "size", "icon-size", "text-size", "title"])) : createCommentVNode("v-if", true)
+                ])
+              ],
+              2
+              /* CLASS */
+            ),
+            unref(socialConfig).length ? (openBlock(), createElementBlock("div", {
+              key: 1,
+              class: normalizeClass(`${unref(ns4).e("icons")} flx-justify-around`),
+              "aria-label": unref(t)("tk.myCard.socialLabel")
+            }, [
+              (openBlock(true), createElementBlock(
+                Fragment,
+                null,
+                renderList(unref(socialConfig), (item, index2) => {
+                  return openBlock(), createElementBlock("a", {
+                    key: index2,
+                    href: item.link && unref(withBase12)(item.link),
+                    title: item.name,
+                    target: "_blank",
+                    "aria-label": item.name
+                  }, [
+                    item.icon ? (openBlock(), createBlock(unref(_sfc_main14), {
                       key: 0,
-                      src: unref(withBase12)(unref(blogger).avatar),
-                      size: unref(blogger).shape === "square" ? "100%" : 100,
-                      shape: shape.value,
-                      "bg-color": "transparent",
-                      alt: unref(t)("tk.myCard.avatarAlt"),
-                      title: unref(t)("tk.myCard.avatarTitle"),
+                      iconType: item.iconType,
+                      icon: item.icon,
+                      size: "20px",
+                      hover: "",
+                      imgAlt: item.imgAlt,
                       "aria-hidden": "true"
-                    }, null, 8, ["src", "size", "shape", "alt", "title"])) : (openBlock(), createBlock(unref(_sfc_main39), {
-                      key: 1,
-                      size: 100,
-                      shape: shape.value,
-                      text: unref(blogger).name,
-                      "text-size": 50,
-                      "bg-color": unref(ns4).cssVar("theme-color"),
-                      "aria-hidden": "true"
-                    }, null, 8, ["shape", "text", "bg-color"]))
-                  ],
-                  2
-                  /* CLASS */
-                ),
-                unref(social).length ? (openBlock(), createElementBlock("div", {
-                  key: 1,
-                  class: normalizeClass(`${unref(ns4).e("icons")} flx-justify-around`),
-                  "aria-label": unref(t)("tk.myCard.socialLabel")
-                }, [
-                  (openBlock(true), createElementBlock(
-                    Fragment,
-                    null,
-                    renderList(unref(social), (item, index2) => {
-                      return openBlock(), createElementBlock("a", {
-                        key: index2,
-                        href: item.link && unref(withBase12)(item.link),
-                        title: item.name,
-                        target: "_blank",
-                        "aria-label": item.name
-                      }, [
-                        item.icon ? (openBlock(), createBlock(unref(_sfc_main14), {
-                          key: 0,
-                          iconType: item.iconType,
-                          icon: item.icon,
-                          size: "20px",
-                          hover: "",
-                          imgAlt: item.imgAlt,
-                          "aria-hidden": "true"
-                        }, null, 8, ["iconType", "icon", "imgAlt"])) : createCommentVNode("v-if", true)
-                      ], 8, _hoisted_224);
-                    }),
-                    128
-                    /* KEYED_FRAGMENT */
-                  ))
-                ], 10, _hoisted_130)) : createCommentVNode("v-if", true),
-                createBaseVNode("div", {
-                  class: normalizeClass(unref(ns4).e("blogger")),
-                  "aria-label": unref(t)("tk.myCard.bloggerLabel")
-                }, [
-                  createBaseVNode(
-                    "h3",
-                    _hoisted_413,
-                    toDisplayString(unref(blogger).name),
-                    1
-                    /* TEXT */
-                  ),
-                  createBaseVNode(
-                    "span",
-                    _hoisted_510,
-                    toDisplayString(unref(blogger).slogan),
-                    1
-                    /* TEXT */
-                  )
-                ], 10, _hoisted_314)
-              ]),
-              _: 1
-              /* STABLE */
-            }, 8, ["class", "style", "aria-label"])) : createCommentVNode("v-if", true)
-          ]),
-          renderSlot(_ctx.$slots, "teek-home-card-my-after")
-        ],
-        64
-        /* STABLE_FRAGMENT */
-      );
+                    }, null, 8, ["iconType", "icon", "imgAlt"])) : createCommentVNode("v-if", true)
+                  ], 8, _hoisted_224);
+                }),
+                128
+                /* KEYED_FRAGMENT */
+              ))
+            ], 10, _hoisted_130)) : createCommentVNode("v-if", true),
+            createBaseVNode("div", {
+              class: normalizeClass(unref(ns4).e("blogger")),
+              "aria-label": unref(t)("tk.myCard.bloggerLabel")
+            }, [
+              createBaseVNode(
+                "h3",
+                _hoisted_413,
+                toDisplayString(unref(bloggerConfig).name),
+                1
+                /* TEXT */
+              ),
+              createBaseVNode(
+                "span",
+                _hoisted_510,
+                toDisplayString(unref(bloggerConfig).slogan),
+                1
+                /* TEXT */
+              )
+            ], 10, _hoisted_314)
+          ];
+        }),
+        _: 1
+        /* STABLE */
+      }, 8, ["class", "style", "aria-label"])) : createCommentVNode("v-if", true);
     };
   }
 });
 
 // node_modules/vitepress-theme-teek/es/components/theme/HomeTopArticleCard/src/index.vue2.mjs
 import { useRouter as useRouter4, withBase as withBase13 } from "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var _hoisted_131 = ["aria-label"];
 var _hoisted_225 = ["href"];
 var _hoisted_315 = { class: "date" };
@@ -18672,112 +18821,101 @@ var _sfc_main41 = defineComponent({
       (_b = (_a = topArticleConfig.value).titleClick) == null ? void 0 : _b.call(_a, router);
     };
     return (_ctx, _cache) => {
-      return openBlock(), createElementBlock(
-        Fragment,
-        null,
-        [
-          renderSlot(_ctx.$slots, "teek-home-card-top-article-before"),
-          renderSlot(_ctx.$slots, "teek-home-card-top-article", {}, () => [
-            createVNode(unref(_sfc_main38), {
-              page: "",
-              modelValue: pageNum.value,
-              "onUpdate:modelValue": _cache[0] || (_cache[0] = ($event) => pageNum.value = $event),
-              pageSize: unref(topArticleConfig).limit,
-              total: topArticleList.value.length,
-              title: finalTitle.value,
-              titleClick: unref(topArticleConfig).titleClick ? handleTitleClick : void 0,
-              autoPage: unref(topArticleConfig).autoPage,
-              pageSpeed: unref(topArticleConfig).pageSpeed,
-              class: normalizeClass(unref(ns4).b()),
-              "aria-label": unref(t)("tk.topArticleCard.label")
-            }, {
-              default: withCtx(({ transitionName: transitionName2 }) => [
-                topArticleList.value.length ? (openBlock(), createBlock(TransitionGroup, {
-                  key: 0,
-                  name: transitionName2,
-                  tag: "ul",
-                  mode: "out-in",
-                  class: normalizeClass(`${unref(ns4).e("list")} flx-column`),
-                  "aria-label": unref(t)("tk.topArticleCard.listLabel")
-                }, {
-                  default: withCtx(() => [
-                    (openBlock(true), createElementBlock(
-                      Fragment,
-                      null,
-                      renderList(currentTopArticleList.value, (item, index2) => {
-                        return openBlock(), createElementBlock("li", {
-                          ref_for: true,
-                          ref_key: "itemRefs",
-                          ref: itemRefs,
-                          key: item.num,
-                          class: normalizeClass(unref(ns4).e("list__item")),
-                          style: normalizeStyle(getStyle(item.num - 1, index2)),
-                          "aria-label": item.title
+      return openBlock(), createBlock(unref(_sfc_main38), {
+        page: "",
+        modelValue: pageNum.value,
+        "onUpdate:modelValue": _cache[0] || (_cache[0] = ($event) => pageNum.value = $event),
+        pageSize: unref(topArticleConfig).limit,
+        total: topArticleList.value.length,
+        title: finalTitle.value,
+        titleClick: unref(topArticleConfig).titleClick ? handleTitleClick : void 0,
+        autoPage: unref(topArticleConfig).autoPage,
+        pageSpeed: unref(topArticleConfig).pageSpeed,
+        class: normalizeClass(unref(ns4).b()),
+        "aria-label": unref(t)("tk.topArticleCard.label")
+      }, {
+        default: withCtx(({ transitionName: transitionName2 }) => [
+          topArticleList.value.length ? (openBlock(), createBlock(TransitionGroup, {
+            key: 0,
+            name: transitionName2,
+            tag: "ul",
+            mode: "out-in",
+            class: normalizeClass(`${unref(ns4).e("list")} flx-column`),
+            "aria-label": unref(t)("tk.topArticleCard.listLabel")
+          }, {
+            default: withCtx(() => [
+              (openBlock(true), createElementBlock(
+                Fragment,
+                null,
+                renderList(currentTopArticleList.value, (item, index2) => {
+                  return openBlock(), createElementBlock("li", {
+                    ref_for: true,
+                    ref_key: "itemRefs",
+                    ref: itemRefs,
+                    key: item.num,
+                    class: normalizeClass(unref(ns4).e("list__item")),
+                    style: normalizeStyle(getStyle(item.num - 1, index2)),
+                    "aria-label": item.title
+                  }, [
+                    createBaseVNode(
+                      "span",
+                      {
+                        class: normalizeClass(["num", { sticky: item.frontmatter.sticky }])
+                      },
+                      toDisplayString(item.num),
+                      3
+                      /* TEXT, CLASS */
+                    ),
+                    createBaseVNode(
+                      "div",
+                      {
+                        class: normalizeClass(unref(ns4).e("list__item__info"))
+                      },
+                      [
+                        createBaseVNode("a", {
+                          href: item.url && unref(withBase13)(item.url),
+                          class: "hover-color flx-align-center"
                         }, [
-                          createBaseVNode(
-                            "span",
-                            {
-                              class: normalizeClass(["num", { sticky: item.frontmatter.sticky }])
-                            },
-                            toDisplayString(item.num),
-                            3
-                            /* TEXT, CLASS */
-                          ),
-                          createBaseVNode(
-                            "div",
-                            {
-                              class: normalizeClass(unref(ns4).e("list__item__info"))
-                            },
-                            [
-                              createBaseVNode("a", {
-                                href: item.url && unref(withBase13)(item.url),
-                                class: "hover-color flx-align-center"
-                              }, [
-                                createVNode(unref(_sfc_main7), {
-                                  post: item,
-                                  "title-tag-props": { position: "right", size: "mini" }
-                                }, null, 8, ["post"])
-                              ], 8, _hoisted_225),
-                              createBaseVNode(
-                                "div",
-                                _hoisted_315,
-                                toDisplayString(formatPostDate(item.date)),
-                                1
-                                /* TEXT */
-                              )
-                            ],
-                            2
-                            /* CLASS */
-                          )
-                        ], 14, _hoisted_131);
-                      }),
-                      128
-                      /* KEYED_FRAGMENT */
-                    ))
-                  ]),
-                  _: 2
-                  /* DYNAMIC */
-                }, 1032, ["name", "class", "aria-label"])) : (openBlock(), createElementBlock("div", {
-                  key: 1,
-                  class: normalizeClass(unref(ns4).m("empty")),
-                  "aria-label": unref(topArticleConfig).emptyLabel
-                }, toDisplayString(unref(topArticleConfig).emptyLabel), 11, _hoisted_414))
-              ]),
-              _: 1
-              /* STABLE */
-            }, 8, ["modelValue", "pageSize", "total", "title", "titleClick", "autoPage", "pageSpeed", "class", "aria-label"])
-          ]),
-          renderSlot(_ctx.$slots, "teek-home-card-top-article-after")
-        ],
-        64
-        /* STABLE_FRAGMENT */
-      );
+                          createVNode(unref(_sfc_main7), {
+                            post: item,
+                            "title-tag-props": { position: "right", size: "mini" }
+                          }, null, 8, ["post"])
+                        ], 8, _hoisted_225),
+                        createBaseVNode(
+                          "div",
+                          _hoisted_315,
+                          toDisplayString(formatPostDate(item.date)),
+                          1
+                          /* TEXT */
+                        )
+                      ],
+                      2
+                      /* CLASS */
+                    )
+                  ], 14, _hoisted_131);
+                }),
+                128
+                /* KEYED_FRAGMENT */
+              ))
+            ]),
+            _: 1
+            /* STABLE */
+          }, 8, ["name", "class", "aria-label"])) : (openBlock(), createElementBlock("div", {
+            key: 1,
+            class: normalizeClass(unref(ns4).m("empty")),
+            "aria-label": unref(topArticleConfig).emptyLabel
+          }, toDisplayString(unref(topArticleConfig).emptyLabel), 11, _hoisted_414))
+        ]),
+        _: 1
+        /* STABLE */
+      }, 8, ["modelValue", "pageSize", "total", "title", "titleClick", "autoPage", "pageSpeed", "class", "aria-label"]);
     };
   }
 });
 
 // node_modules/vitepress-theme-teek/es/components/theme/HomeCategoryCard/src/index.vue2.mjs
 import { useRouter as useRouter5, withBase as withBase14 } from "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 
 // node_modules/vitepress-theme-teek/es/components/theme/Home/src/home.mjs
 var postDataUpdateSymbol = Symbol("postDataUpdate");
@@ -18862,98 +19000,87 @@ var _sfc_main42 = defineComponent({
     );
     const itemRefs = ref([]);
     return (_ctx, _cache) => {
-      return openBlock(), createElementBlock(
-        Fragment,
-        null,
-        [
-          renderSlot(_ctx.$slots, "teek-home-card-category-before"),
-          renderSlot(_ctx.$slots, "teek-home-card-category", {}, () => [
-            createVNode(unref(_sfc_main38), {
-              page: !_ctx.categoriesPage,
-              modelValue: pageNum.value,
-              "onUpdate:modelValue": _cache[0] || (_cache[0] = ($event) => pageNum.value = $event),
-              pageSize: unref(categoryConfig).limit,
-              total: categories.value.length,
-              title: finalTitle.value[_ctx.categoriesPage ? "pt" : "ht"],
-              titleClick: handleSwitchCategory,
-              autoPage: unref(categoryConfig).autoPage,
-              pageSpeed: unref(categoryConfig).pageSpeed,
-              class: normalizeClass([unref(ns4).b(), unref(ns4).is("page", _ctx.categoriesPage)]),
-              "aria-label": unref(t)("tk.categoryCard.label")
-            }, {
-              default: withCtx(({ transitionName: transitionName2 }) => [
-                categories.value.length ? (openBlock(), createBlock(TransitionGroup, {
-                  key: 0,
-                  name: transitionName2,
-                  tag: "div",
-                  mode: "out-in",
-                  class: normalizeClass(`${unref(ns4).e("list")} flx-column`),
-                  "aria-label": unref(t)("tk.categoryCard.listLabel")
-                }, {
-                  default: withCtx(() => [
-                    (openBlock(true), createElementBlock(
-                      Fragment,
+      return openBlock(), createBlock(unref(_sfc_main38), {
+        page: !__props.categoriesPage,
+        modelValue: pageNum.value,
+        "onUpdate:modelValue": _cache[0] || (_cache[0] = ($event) => pageNum.value = $event),
+        pageSize: unref(categoryConfig).limit,
+        total: categories.value.length,
+        title: finalTitle.value[__props.categoriesPage ? "pt" : "ht"],
+        titleClick: handleSwitchCategory,
+        autoPage: unref(categoryConfig).autoPage,
+        pageSpeed: unref(categoryConfig).pageSpeed,
+        class: normalizeClass([unref(ns4).b(), unref(ns4).is("page", __props.categoriesPage)]),
+        "aria-label": unref(t)("tk.categoryCard.label")
+      }, {
+        default: withCtx(({ transitionName: transitionName2 }) => [
+          categories.value.length ? (openBlock(), createBlock(TransitionGroup, {
+            key: 0,
+            name: transitionName2,
+            tag: "div",
+            mode: "out-in",
+            class: normalizeClass(`${unref(ns4).e("list")} flx-column`),
+            "aria-label": unref(t)("tk.categoryCard.listLabel")
+          }, {
+            default: withCtx(() => [
+              (openBlock(true), createElementBlock(
+                Fragment,
+                null,
+                renderList(currentCategories.value, (item, index2) => {
+                  var _a, _b;
+                  return openBlock(), createElementBlock("a", {
+                    ref_for: true,
+                    ref_key: "itemRefs",
+                    ref: itemRefs,
+                    key: item.name,
+                    onClick: ($event) => handleSwitchCategory(item.name),
+                    class: normalizeClass([{ active: item.name === selectedCategory.value }, "hover-color"]),
+                    style: normalizeStyle(`top: ${index2 * ((_b = (_a = itemRefs.value) == null ? void 0 : _a[index2]) == null ? void 0 : _b.getBoundingClientRect().height) || 0}px`),
+                    "aria-label": item.name
+                  }, [
+                    createBaseVNode(
+                      "span",
+                      _hoisted_226,
+                      toDisplayString(item.name),
+                      1
+                      /* TEXT */
+                    ),
+                    createBaseVNode(
+                      "span",
                       null,
-                      renderList(currentCategories.value, (item, index2) => {
-                        var _a, _b;
-                        return openBlock(), createElementBlock("a", {
-                          ref_for: true,
-                          ref_key: "itemRefs",
-                          ref: itemRefs,
-                          key: item.name,
-                          onClick: ($event) => handleSwitchCategory(item.name),
-                          class: normalizeClass([{ active: item.name === selectedCategory.value }, "hover-color"]),
-                          style: normalizeStyle(`top: ${index2 * ((_b = (_a = itemRefs.value) == null ? void 0 : _a[index2]) == null ? void 0 : _b.getBoundingClientRect().height) || 0}px`),
-                          "aria-label": item.name
-                        }, [
-                          createBaseVNode(
-                            "span",
-                            _hoisted_226,
-                            toDisplayString(item.name),
-                            1
-                            /* TEXT */
-                          ),
-                          createBaseVNode(
-                            "span",
-                            null,
-                            toDisplayString(item.length),
-                            1
-                            /* TEXT */
-                          )
-                        ], 14, _hoisted_132);
-                      }),
-                      128
-                      /* KEYED_FRAGMENT */
-                    )),
-                    !_ctx.categoriesPage && unref(categoryConfig).limit < categories.value.length ? (openBlock(), createElementBlock("a", {
-                      key: 0,
-                      href: unref(withBase14)(unref(categoryPath)),
-                      "aria-label": unref(categoryConfig).moreLabel
-                    }, toDisplayString(unref(categoryConfig).moreLabel), 9, _hoisted_316)) : createCommentVNode("v-if", true)
-                  ]),
-                  _: 2
-                  /* DYNAMIC */
-                }, 1032, ["name", "class", "aria-label"])) : (openBlock(), createElementBlock("div", {
-                  key: 1,
-                  class: normalizeClass(unref(ns4).m("empty")),
-                  "aria-label": unref(categoryConfig).emptyLabel
-                }, toDisplayString(unref(categoryConfig).emptyLabel), 11, _hoisted_415))
-              ]),
-              _: 1
-              /* STABLE */
-            }, 8, ["page", "modelValue", "pageSize", "total", "title", "autoPage", "pageSpeed", "class", "aria-label"])
-          ]),
-          renderSlot(_ctx.$slots, "teek-home-card-category-after")
-        ],
-        64
-        /* STABLE_FRAGMENT */
-      );
+                      toDisplayString(item.length),
+                      1
+                      /* TEXT */
+                    )
+                  ], 14, _hoisted_132);
+                }),
+                128
+                /* KEYED_FRAGMENT */
+              )),
+              !__props.categoriesPage && unref(categoryConfig).limit < categories.value.length ? (openBlock(), createElementBlock("a", {
+                key: 0,
+                href: unref(withBase14)(unref(categoryPath)),
+                "aria-label": unref(categoryConfig).moreLabel
+              }, toDisplayString(unref(categoryConfig).moreLabel), 9, _hoisted_316)) : createCommentVNode("v-if", true)
+            ]),
+            _: 1
+            /* STABLE */
+          }, 8, ["name", "class", "aria-label"])) : (openBlock(), createElementBlock("div", {
+            key: 1,
+            class: normalizeClass(unref(ns4).m("empty")),
+            "aria-label": unref(categoryConfig).emptyLabel
+          }, toDisplayString(unref(categoryConfig).emptyLabel), 11, _hoisted_415))
+        ]),
+        _: 1
+        /* STABLE */
+      }, 8, ["page", "modelValue", "pageSize", "total", "title", "autoPage", "pageSpeed", "class", "aria-label"]);
     };
   }
 });
 
 // node_modules/vitepress-theme-teek/es/components/theme/HomeTagCard/src/index.vue2.mjs
 import { useRouter as useRouter6, withBase as withBase15 } from "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var _hoisted_133 = ["onClick", "aria-label"];
 var _hoisted_227 = { class: "num" };
 var _hoisted_317 = ["href", "aria-label"];
@@ -19043,102 +19170,92 @@ var _sfc_main43 = defineComponent({
       }
     );
     return (_ctx, _cache) => {
-      return openBlock(), createElementBlock(
-        Fragment,
-        null,
-        [
-          renderSlot(_ctx.$slots, "teek-home-card-tag-before"),
-          renderSlot(_ctx.$slots, "teek-home-card-tag", {}, () => [
-            createVNode(unref(_sfc_main38), {
-              page: !_ctx.tagsPage,
-              modelValue: pageNum.value,
-              "onUpdate:modelValue": _cache[0] || (_cache[0] = ($event) => pageNum.value = $event),
-              pageSize: unref(tagConfig).limit,
-              total: tags.value.length,
-              title: finalTitle.value[_ctx.tagsPage ? "pt" : "ht"],
-              titleClick: handleSwitchTag,
-              autoPage: unref(tagConfig).autoPage,
-              pageSpeed: unref(tagConfig).pageSpeed,
-              class: normalizeClass([unref(ns4).b(), unref(ns4).is("page", _ctx.tagsPage)]),
-              "aria-label": unref(t)("tk.tagCard.label")
-            }, {
-              default: withCtx(({ transitionName: transitionName2 }) => [
-                tags.value.length ? (openBlock(), createBlock(TransitionGroup, {
-                  key: 0,
-                  name: transitionName2,
-                  tag: "div",
-                  mode: "out-in",
-                  class: normalizeClass(unref(ns4).e("list")),
-                  "aria-label": unref(t)("tk.tagCard.listLabel")
-                }, {
-                  default: withCtx(() => [
-                    (openBlock(true), createElementBlock(
-                      Fragment,
+      return openBlock(), createBlock(unref(_sfc_main38), {
+        page: !__props.tagsPage,
+        modelValue: pageNum.value,
+        "onUpdate:modelValue": _cache[0] || (_cache[0] = ($event) => pageNum.value = $event),
+        pageSize: unref(tagConfig).limit,
+        total: tags.value.length,
+        title: finalTitle.value[__props.tagsPage ? "pt" : "ht"],
+        titleClick: handleSwitchTag,
+        autoPage: unref(tagConfig).autoPage,
+        pageSpeed: unref(tagConfig).pageSpeed,
+        class: normalizeClass([unref(ns4).b(), unref(ns4).is("page", __props.tagsPage)]),
+        "aria-label": unref(t)("tk.tagCard.label")
+      }, {
+        default: withCtx(({ transitionName: transitionName2 }) => [
+          tags.value.length ? (openBlock(), createBlock(TransitionGroup, {
+            key: 0,
+            name: transitionName2,
+            tag: "div",
+            mode: "out-in",
+            class: normalizeClass(unref(ns4).e("list")),
+            "aria-label": unref(t)("tk.tagCard.listLabel")
+          }, {
+            default: withCtx(() => [
+              (openBlock(true), createElementBlock(
+                Fragment,
+                null,
+                renderList(currentTags.value, (item, index2) => {
+                  return openBlock(), createElementBlock("a", {
+                    key: item.name,
+                    style: normalizeStyle(getTagStyle(index2)),
+                    onClick: ($event) => handleSwitchTag(item.name),
+                    class: normalizeClass([{ active: item.name === selectedTag.value }, unref(ns4).join("pointer")]),
+                    "aria-label": item.name
+                  }, [
+                    createBaseVNode(
+                      "span",
                       null,
-                      renderList(currentTags.value, (item, index2) => {
-                        return openBlock(), createElementBlock("a", {
-                          key: item.name,
-                          style: normalizeStyle(getTagStyle(index2)),
-                          onClick: ($event) => handleSwitchTag(item.name),
-                          class: normalizeClass([{ active: item.name === selectedTag.value }, unref(ns4).join("pointer")]),
-                          "aria-label": item.name
-                        }, [
-                          createBaseVNode(
-                            "span",
-                            null,
-                            toDisplayString(item.name),
-                            1
-                            /* TEXT */
-                          ),
-                          createBaseVNode(
-                            "span",
-                            _hoisted_227,
-                            toDisplayString(item.length),
-                            1
-                            /* TEXT */
-                          )
-                        ], 14, _hoisted_133);
-                      }),
-                      128
-                      /* KEYED_FRAGMENT */
-                    )),
-                    !_ctx.tagsPage && unref(tagConfig).limit < tags.value.length ? (openBlock(), createElementBlock("a", {
-                      key: 0,
-                      href: unref(withBase15)(unref(tagPath)),
-                      class: "more",
-                      "aria-label": unref(tagConfig).moreLabel
-                    }, toDisplayString(unref(tagConfig).moreLabel), 9, _hoisted_317)) : createCommentVNode("v-if", true)
-                  ]),
-                  _: 2
-                  /* DYNAMIC */
-                }, 1032, ["name", "class", "aria-label"])) : (openBlock(), createElementBlock("div", {
-                  key: 1,
-                  class: normalizeClass(unref(ns4).m("empty")),
-                  "aria-label": unref(tagConfig).emptyLabel
-                }, toDisplayString(unref(tagConfig).emptyLabel), 11, _hoisted_416))
-              ]),
-              _: 1
-              /* STABLE */
-            }, 8, ["page", "modelValue", "pageSize", "total", "title", "autoPage", "pageSpeed", "class", "aria-label"])
-          ]),
-          renderSlot(_ctx.$slots, "teek-home-card-tag-after")
-        ],
-        64
-        /* STABLE_FRAGMENT */
-      );
+                      toDisplayString(item.name),
+                      1
+                      /* TEXT */
+                    ),
+                    createBaseVNode(
+                      "span",
+                      _hoisted_227,
+                      toDisplayString(item.length),
+                      1
+                      /* TEXT */
+                    )
+                  ], 14, _hoisted_133);
+                }),
+                128
+                /* KEYED_FRAGMENT */
+              )),
+              !__props.tagsPage && unref(tagConfig).limit < tags.value.length ? (openBlock(), createElementBlock("a", {
+                key: 0,
+                href: unref(withBase15)(unref(tagPath)),
+                class: "more",
+                "aria-label": unref(tagConfig).moreLabel
+              }, toDisplayString(unref(tagConfig).moreLabel), 9, _hoisted_317)) : createCommentVNode("v-if", true)
+            ]),
+            _: 1
+            /* STABLE */
+          }, 8, ["name", "class", "aria-label"])) : (openBlock(), createElementBlock("div", {
+            key: 1,
+            class: normalizeClass(unref(ns4).m("empty")),
+            "aria-label": unref(tagConfig).emptyLabel
+          }, toDisplayString(unref(tagConfig).emptyLabel), 11, _hoisted_416))
+        ]),
+        _: 1
+        /* STABLE */
+      }, 8, ["page", "modelValue", "pageSize", "total", "title", "autoPage", "pageSpeed", "class", "aria-label"]);
     };
   }
 });
 
 // node_modules/vitepress-theme-teek/es/components/theme/HomeFriendLinkCard/src/index.vue2.mjs
 import { useRouter as useRouter7 } from "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 
 // node_modules/vitepress-theme-teek/es/components/theme/HomeFriendLinkCard/src/ItemInfo.vue2.mjs
 import { withBase as withBase16 } from "vitepress";
 var _hoisted_134 = ["href", "aria-label"];
-var _hoisted_228 = ["src", "alt"];
-var _hoisted_318 = ["title"];
+var _hoisted_228 = { class: "friend-avatar skeleton-image" };
+var _hoisted_318 = ["src", "alt"];
 var _hoisted_417 = ["title"];
+var _hoisted_511 = ["title"];
 var _sfc_main44 = defineComponent({
   __name: "ItemInfo",
   props: {
@@ -19148,31 +19265,41 @@ var _sfc_main44 = defineComponent({
   setup(__props) {
     return (_ctx, _cache) => {
       return openBlock(), createElementBlock("a", {
-        href: _ctx.item.link && unref(withBase16)(_ctx.item.link),
+        href: __props.item.link && unref(withBase16)(__props.item.link),
         target: "_blank",
         class: "hover-color flx-align-center",
-        "aria-label": _ctx.item.name
+        "aria-label": __props.item.name
       }, [
-        createBaseVNode("img", {
-          src: _ctx.item.avatar && unref(withBase16)(_ctx.item.avatar),
-          class: "friend-avatar",
-          alt: _ctx.item.alt || _ctx.item.name,
-          "aria-hidden": "true"
-        }, null, 8, _hoisted_228),
+        createBaseVNode("div", _hoisted_228, [
+          createBaseVNode("img", {
+            src: __props.item.avatar && unref(withBase16)(__props.item.avatar),
+            class: "avatar",
+            alt: __props.item.alt || __props.item.name,
+            "aria-hidden": "true",
+            onLoad: _cache[0] || (_cache[0] = (e) => {
+              var _a;
+              return (_a = e.target) == null ? void 0 : _a.classList.add("loaded");
+            }),
+            onError: _cache[1] || (_cache[1] = (e) => {
+              var _a;
+              return (_a = e.target) == null ? void 0 : _a.classList.add("loaded");
+            })
+          }, null, 40, _hoisted_318)
+        ]),
         createBaseVNode(
           "div",
           {
-            class: normalizeClass(_ctx.ns.e("list__item__info"))
+            class: normalizeClass(__props.ns.e("list__item__info"))
           },
           [
             createBaseVNode("div", {
               class: "friend-name sle",
-              title: _ctx.item.name
-            }, toDisplayString(_ctx.item.name), 9, _hoisted_318),
+              title: __props.item.name
+            }, toDisplayString(__props.item.name), 9, _hoisted_417),
             createBaseVNode("div", {
               class: "friend-desc sle",
-              title: _ctx.item.desc
-            }, toDisplayString(_ctx.item.desc), 9, _hoisted_417)
+              title: __props.item.desc
+            }, toDisplayString(__props.item.desc), 9, _hoisted_511)
           ],
           2
           /* CLASS */
@@ -19235,113 +19362,102 @@ var _sfc_main45 = defineComponent({
       (_b = (_a = friendLinkConfig.value).titleClick) == null ? void 0 : _b.call(_a, router);
     };
     return (_ctx, _cache) => {
-      return openBlock(), createElementBlock(
-        Fragment,
-        null,
-        [
-          renderSlot(_ctx.$slots, "teek-home-card-friend-link-before"),
-          renderSlot(_ctx.$slots, "teek-home-card-friend-link", {}, () => [
-            createVNode(unref(_sfc_main38), {
-              page: !unref(friendLinkConfig).autoScroll,
-              modelValue: pageNum.value,
-              "onUpdate:modelValue": _cache[0] || (_cache[0] = ($event) => pageNum.value = $event),
-              pageSize: unref(friendLinkConfig).limit,
-              total: unref(friendLinkConfig).list.length,
-              title: finalTitle.value,
-              titleClick: unref(friendLinkConfig).titleClick ? handleTitleClick : void 0,
-              autoPage: unref(friendLinkConfig).autoPage,
-              pageSpeed: unref(friendLinkConfig).pageSpeed,
-              class: normalizeClass(unref(ns4).b()),
-              "aria-label": unref(t)("tk.friendLinkCard.label")
-            }, {
-              default: withCtx(({ transitionName: transitionName2, startAutoPage, closeAutoPage }) => [
-                unref(friendLinkConfig).list.length ? (openBlock(), createBlock(TransitionGroup, {
-                  key: 0,
-                  name: transitionName2,
-                  tag: "ul",
-                  mode: "out-in",
-                  class: normalizeClass(`${unref(ns4).e("list")} flx-column`),
-                  onMouseenter: ($event) => unref(friendLinkConfig).autoScroll ? unref(stop)() : unref(friendLinkConfig).autoPage ? closeAutoPage() : () => {
-                  },
-                  onMouseleave: ($event) => unref(friendLinkConfig).autoScroll ? unref(start)() : unref(friendLinkConfig).autoPage ? startAutoPage() : () => {
-                  },
-                  "aria-label": unref(t)("tk.friendLinkCard.listLabel")
-                }, {
-                  default: withCtx(() => [
-                    unref(friendLinkConfig).autoScroll ? (openBlock(true), createElementBlock(
-                      Fragment,
-                      { key: 0 },
-                      renderList(currentFriendLinkList.value, (item, index2) => {
-                        return openBlock(), createElementBlock(
-                          "li",
-                          {
-                            key: item.name,
-                            class: normalizeClass(unref(ns4).e("list__item")),
-                            style: normalizeStyle(getLiStyle(index2))
-                          },
-                          [
-                            createVNode(_sfc_main44, {
-                              item,
-                              ns: unref(ns4)
-                            }, null, 8, ["item", "ns"])
-                          ],
-                          6
-                          /* CLASS, STYLE */
-                        );
-                      }),
-                      128
-                      /* KEYED_FRAGMENT */
-                    )) : (openBlock(true), createElementBlock(
-                      Fragment,
-                      { key: 1 },
-                      renderList(currentFriendLinkList.value, (item, index2) => {
-                        return openBlock(), createElementBlock(
-                          "li",
-                          {
-                            ref_for: true,
-                            ref_key: "itemRefs",
-                            ref: itemRefs,
-                            key: item.name,
-                            class: normalizeClass(unref(ns4).e("list__item")),
-                            style: normalizeStyle(getLiStyle(index2))
-                          },
-                          [
-                            createVNode(_sfc_main44, {
-                              item,
-                              ns: unref(ns4)
-                            }, null, 8, ["item", "ns"])
-                          ],
-                          6
-                          /* CLASS, STYLE */
-                        );
-                      }),
-                      128
-                      /* KEYED_FRAGMENT */
-                    ))
-                  ]),
-                  _: 2
-                  /* DYNAMIC */
-                }, 1032, ["name", "class", "onMouseenter", "onMouseleave", "aria-label"])) : (openBlock(), createElementBlock("div", {
-                  key: 1,
-                  class: normalizeClass(unref(ns4).m("empty")),
-                  "aria-label": unref(friendLinkConfig).emptyLabel
-                }, toDisplayString(unref(friendLinkConfig).emptyLabel), 11, _hoisted_135))
-              ]),
-              _: 1
-              /* STABLE */
-            }, 8, ["page", "modelValue", "pageSize", "total", "title", "titleClick", "autoPage", "pageSpeed", "class", "aria-label"])
-          ]),
-          renderSlot(_ctx.$slots, "teek-home-card-friend-link-after")
-        ],
-        64
-        /* STABLE_FRAGMENT */
-      );
+      return openBlock(), createBlock(unref(_sfc_main38), {
+        page: !unref(friendLinkConfig).autoScroll,
+        modelValue: pageNum.value,
+        "onUpdate:modelValue": _cache[0] || (_cache[0] = ($event) => pageNum.value = $event),
+        pageSize: unref(friendLinkConfig).limit,
+        total: unref(friendLinkConfig).list.length,
+        title: finalTitle.value,
+        titleClick: unref(friendLinkConfig).titleClick ? handleTitleClick : void 0,
+        autoPage: unref(friendLinkConfig).autoPage,
+        pageSpeed: unref(friendLinkConfig).pageSpeed,
+        class: normalizeClass(unref(ns4).b()),
+        "aria-label": unref(t)("tk.friendLinkCard.label")
+      }, {
+        default: withCtx(({ transitionName: transitionName2, startAutoPage, closeAutoPage }) => [
+          unref(friendLinkConfig).list.length ? (openBlock(), createBlock(TransitionGroup, {
+            key: 0,
+            name: transitionName2,
+            tag: "ul",
+            mode: "out-in",
+            class: normalizeClass(`${unref(ns4).e("list")} flx-column`),
+            onMouseenter: ($event) => unref(friendLinkConfig).autoScroll ? unref(stop)() : unref(friendLinkConfig).autoPage ? closeAutoPage() : () => {
+            },
+            onMouseleave: ($event) => unref(friendLinkConfig).autoScroll ? unref(start)() : unref(friendLinkConfig).autoPage ? startAutoPage() : () => {
+            },
+            "aria-label": unref(t)("tk.friendLinkCard.listLabel")
+          }, {
+            default: withCtx(() => [
+              unref(friendLinkConfig).autoScroll ? (openBlock(true), createElementBlock(
+                Fragment,
+                { key: 0 },
+                renderList(currentFriendLinkList.value, (item, index2) => {
+                  return openBlock(), createElementBlock(
+                    "li",
+                    {
+                      key: item.name,
+                      class: normalizeClass(unref(ns4).e("list__item")),
+                      style: normalizeStyle(getLiStyle(index2))
+                    },
+                    [
+                      createVNode(_sfc_main44, {
+                        item,
+                        ns: unref(ns4)
+                      }, null, 8, ["item", "ns"])
+                    ],
+                    6
+                    /* CLASS, STYLE */
+                  );
+                }),
+                128
+                /* KEYED_FRAGMENT */
+              )) : (openBlock(true), createElementBlock(
+                Fragment,
+                { key: 1 },
+                renderList(currentFriendLinkList.value, (item, index2) => {
+                  return openBlock(), createElementBlock(
+                    "li",
+                    {
+                      ref_for: true,
+                      ref_key: "itemRefs",
+                      ref: itemRefs,
+                      key: item.name,
+                      class: normalizeClass(unref(ns4).e("list__item")),
+                      style: normalizeStyle(getLiStyle(index2))
+                    },
+                    [
+                      createVNode(_sfc_main44, {
+                        item,
+                        ns: unref(ns4)
+                      }, null, 8, ["item", "ns"])
+                    ],
+                    6
+                    /* CLASS, STYLE */
+                  );
+                }),
+                128
+                /* KEYED_FRAGMENT */
+              ))
+            ]),
+            _: 1
+            /* STABLE */
+          }, 8, ["name", "class", "onMouseenter", "onMouseleave", "aria-label"])) : (openBlock(), createElementBlock("div", {
+            key: 1,
+            class: normalizeClass(unref(ns4).m("empty")),
+            "aria-label": unref(friendLinkConfig).emptyLabel
+          }, toDisplayString(unref(friendLinkConfig).emptyLabel), 11, _hoisted_135))
+        ]),
+        _: 1
+        /* STABLE */
+      }, 8, ["page", "modelValue", "pageSize", "total", "title", "titleClick", "autoPage", "pageSpeed", "class", "aria-label"]);
     };
   }
 });
 
 // node_modules/vitepress-theme-teek/es/components/theme/HomeDocAnalysisCard/src/index.vue2.mjs
 import { useData as useData18 } from "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var _hoisted_136 = ["innerHTML"];
 var _hoisted_229 = ["innerHTML"];
 var _sfc_main46 = defineComponent({
@@ -19414,9 +19530,13 @@ var _sfc_main46 = defineComponent({
       },
       { immediate: true }
     );
+    const appendInfo = computed(() => {
+      const { appendInfo: appendInfo2 } = docAnalysisConfig.value;
+      return isFunction(appendInfo2) ? appendInfo2() : appendInfo2;
+    });
     const docAnalysisList = computed(() => {
       var _a, _b, _c, _d;
-      const { createTime, appendInfo, overrideInfo } = docAnalysisConfig.value;
+      const { createTime, overrideInfo } = docAnalysisConfig.value;
       const { fileList = [], totalFileWords, lastCommitTime } = docAnalysisInfo.value;
       const list = [
         {
@@ -19469,7 +19589,7 @@ var _sfc_main46 = defineComponent({
           value: isGet.value ? `${siteUv.value} ${t("tk.docAnalysisCard.visitCountUnit")}` : "Get...",
           show: useSiteView.value
         },
-        ...appendInfo
+        ...appendInfo.value
       ];
       if (overrideInfo.length) {
         list.forEach((item) => {
@@ -19484,63 +19604,51 @@ var _sfc_main46 = defineComponent({
       return list;
     });
     return (_ctx, _cache) => {
-      return openBlock(), createElementBlock(
-        Fragment,
-        null,
-        [
-          renderSlot(_ctx.$slots, "teek-home-card-doc-analysis-before"),
-          renderSlot(_ctx.$slots, "teek-home-card-doc-analysis", {}, () => [
-            createVNode(unref(_sfc_main38), {
-              title: finalTitle.value,
-              class: normalizeClass(unref(ns4).b()),
-              "aria-label": unref(t)("tk.docAnalysisCard.label")
-            }, {
-              default: withCtx(() => [
-                (openBlock(true), createElementBlock(
-                  Fragment,
-                  null,
-                  renderList(docAnalysisList.value, (item) => {
-                    return openBlock(), createElementBlock(
-                      Fragment,
-                      {
-                        key: item.key
-                      },
-                      [
-                        item.show !== false ? (openBlock(), createElementBlock(
-                          "div",
-                          {
-                            key: 0,
-                            class: normalizeClass(unref(ns4).e("item"))
-                          },
-                          [
-                            createBaseVNode("span", {
-                              innerHTML: item.label
-                            }, null, 8, _hoisted_136),
-                            createBaseVNode("span", {
-                              innerHTML: item.value
-                            }, null, 8, _hoisted_229)
-                          ],
-                          2
-                          /* CLASS */
-                        )) : createCommentVNode("v-if", true)
-                      ],
-                      64
-                      /* STABLE_FRAGMENT */
-                    );
-                  }),
-                  128
-                  /* KEYED_FRAGMENT */
-                ))
-              ]),
-              _: 1
-              /* STABLE */
-            }, 8, ["title", "class", "aria-label"])
-          ]),
-          renderSlot(_ctx.$slots, "teek-home-card-doc-analysis-after")
-        ],
-        64
-        /* STABLE_FRAGMENT */
-      );
+      return openBlock(), createBlock(unref(_sfc_main38), {
+        title: finalTitle.value,
+        class: normalizeClass(unref(ns4).b()),
+        "aria-label": unref(t)("tk.docAnalysisCard.label")
+      }, {
+        default: withCtx(() => [
+          (openBlock(true), createElementBlock(
+            Fragment,
+            null,
+            renderList(docAnalysisList.value, (item) => {
+              return openBlock(), createElementBlock(
+                Fragment,
+                {
+                  key: item.key
+                },
+                [
+                  item.show !== false ? (openBlock(), createElementBlock(
+                    "div",
+                    {
+                      key: 0,
+                      class: normalizeClass(unref(ns4).e("item"))
+                    },
+                    [
+                      createBaseVNode("span", {
+                        innerHTML: item.label
+                      }, null, 8, _hoisted_136),
+                      createBaseVNode("span", {
+                        innerHTML: item.value
+                      }, null, 8, _hoisted_229)
+                    ],
+                    2
+                    /* CLASS */
+                  )) : createCommentVNode("v-if", true)
+                ],
+                64
+                /* STABLE_FRAGMENT */
+              );
+            }),
+            128
+            /* KEYED_FRAGMENT */
+          ))
+        ]),
+        _: 1
+        /* STABLE */
+      }, 8, ["title", "class", "aria-label"]);
     };
   }
 });
@@ -19567,39 +19675,39 @@ var _sfc_main47 = defineComponent({
         my: {
           el: _sfc_main40,
           show: homePage,
-          slot: ["teek-home-my-before", "teek-home-my-after"]
+          slot: "teek-home-card-my"
         },
         topArticle: {
           el: _sfc_main41,
           show: homePage && (topArticle == null ? void 0 : topArticle.enabled) !== false,
-          slot: ["teek-home-top-article-before", "teek-home-top-article-after"]
+          slot: "teek-home-card-top-article"
         },
         category: {
           el: _sfc_main42,
           props: { categoriesPage },
           show: (homePage || categoriesPage) && (category == null ? void 0 : category.enabled) !== false,
-          slot: ["teek-home-category-before", "teek-home-category-after"]
+          slot: "teek-home-card-category"
         },
         tag: {
           el: _sfc_main43,
           props: { tagsPage },
           show: (homePage || tagsPage) && (tag == null ? void 0 : tag.enabled) !== false,
-          slot: ["teek-home-tag-before", "teek-home-tag-after"]
+          slot: "teek-home-card-tag"
         },
         docAnalysis: {
           el: _sfc_main46,
           show: homePage && (docAnalysis == null ? void 0 : docAnalysis.enabled) !== false,
-          slot: ["teek-home-doc-analysis-before", "teek-home-doc-analysis-after"]
+          slot: "teek-home-card-doc-analysis"
         },
         friendLink: {
           el: _sfc_main45,
           show: homePage && (friendLink == null ? void 0 : friendLink.enabled) !== false,
-          slot: ["teek-home-friend-link-before", "teek-home-friend-link-after"]
+          slot: "teek-home-card-friend-link"
         }
       };
     });
     const windowTransition = useWindowTransitionConfig((config) => config.card);
-    const cardListInstance = useTemplateRef("cardListInstance");
+    const cardListInstance = ref(null);
     const { start } = useWindowTransition(cardListInstance, false);
     onMounted(() => {
       windowTransition.value && start();
@@ -19612,78 +19720,101 @@ var _sfc_main47 = defineComponent({
         },
         [
           renderSlot(_ctx.$slots, "teek-home-card-before"),
-          renderSlot(_ctx.$slots, "teek-home-card", {}, () => [
+          renderSlot(_ctx.$slots, "teek-home-card", { homeCard: finalHomeCardSort.value }, () => [
             (openBlock(true), createElementBlock(
               Fragment,
               null,
               renderList(finalHomeCardSort.value, (item) => {
-                var _a, _b, _c, _d, _e, _f, _g, _h;
+                var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
                 return openBlock(), createElementBlock(
                   Fragment,
                   { key: item },
                   [
                     createCommentVNode(" 使用淡入动画 "),
                     unref(windowTransition) ? (openBlock(), createElementBlock(
-                      "div",
-                      {
-                        key: 0,
-                        ref_for: true,
-                        ref_key: "cardListInstance",
-                        ref: cardListInstance
-                      },
+                      Fragment,
+                      { key: 0 },
                       [
-                        ((_a = componentMap.value[item]) == null ? void 0 : _a.show) ? (openBlock(), createBlock(
-                          resolveDynamicComponent((_b = componentMap.value[item]) == null ? void 0 : _b.el),
-                          mergeProps({
+                        _ctx.$slots[`${(_a = componentMap.value[item]) == null ? void 0 : _a.slot}-before`] ? (openBlock(), createElementBlock(
+                          "div",
+                          {
                             key: 0,
-                            ref_for: true
-                          }, (_c = componentMap.value[item]) == null ? void 0 : _c.props),
-                          createSlots({
-                            _: 2
-                            /* DYNAMIC */
-                          }, [
-                            renderList((_d = componentMap.value[item]) == null ? void 0 : _d.slot, (name) => {
-                              return {
-                                name,
-                                fn: withCtx(() => [
-                                  renderSlot(_ctx.$slots, name)
-                                ])
-                              };
+                            ref_for: true,
+                            ref_key: "cardListInstance",
+                            ref: cardListInstance
+                          },
+                          [
+                            renderSlot(_ctx.$slots, `${(_b = componentMap.value[item]) == null ? void 0 : _b.slot}-before`)
+                          ],
+                          512
+                          /* NEED_PATCH */
+                        )) : createCommentVNode("v-if", true),
+                        createBaseVNode(
+                          "div",
+                          {
+                            ref_for: true,
+                            ref_key: "cardListInstance",
+                            ref: cardListInstance
+                          },
+                          [
+                            renderSlot(_ctx.$slots, (_c = componentMap.value[item]) == null ? void 0 : _c.slot, {}, () => {
+                              var _a2, _b2, _c2;
+                              return [
+                                ((_a2 = componentMap.value[item]) == null ? void 0 : _a2.show) ? (openBlock(), createBlock(
+                                  resolveDynamicComponent((_b2 = componentMap.value[item]) == null ? void 0 : _b2.el),
+                                  mergeProps({
+                                    key: 0,
+                                    ref_for: true
+                                  }, (_c2 = componentMap.value[item]) == null ? void 0 : _c2.props),
+                                  null,
+                                  16
+                                  /* FULL_PROPS */
+                                )) : createCommentVNode("v-if", true)
+                              ];
                             })
-                          ]),
-                          1040
-                          /* FULL_PROPS, DYNAMIC_SLOTS */
+                          ],
+                          512
+                          /* NEED_PATCH */
+                        ),
+                        _ctx.$slots[`${(_d = componentMap.value[item]) == null ? void 0 : _d.slot}-after`] ? (openBlock(), createElementBlock(
+                          "div",
+                          {
+                            key: 1,
+                            ref_for: true,
+                            ref_key: "cardListInstance",
+                            ref: cardListInstance
+                          },
+                          [
+                            renderSlot(_ctx.$slots, `${(_e = componentMap.value[item]) == null ? void 0 : _e.slot}-after`)
+                          ],
+                          512
+                          /* NEED_PATCH */
                         )) : createCommentVNode("v-if", true)
                       ],
-                      512
-                      /* NEED_PATCH */
+                      64
+                      /* STABLE_FRAGMENT */
                     )) : (openBlock(), createElementBlock(
                       Fragment,
                       { key: 1 },
                       [
                         createCommentVNode(" 不使用淡入动画 "),
-                        ((_e = componentMap.value[item]) == null ? void 0 : _e.show) ? (openBlock(), createBlock(
-                          resolveDynamicComponent((_f = componentMap.value[item]) == null ? void 0 : _f.el),
-                          mergeProps({
-                            key: 0,
-                            ref_for: true
-                          }, (_g = componentMap.value[item]) == null ? void 0 : _g.props),
-                          createSlots({
-                            _: 2
-                            /* DYNAMIC */
-                          }, [
-                            renderList((_h = componentMap.value[item]) == null ? void 0 : _h.slot, (name) => {
-                              return {
-                                name,
-                                fn: withCtx(() => [
-                                  renderSlot(_ctx.$slots, name)
-                                ])
-                              };
-                            })
-                          ]),
-                          1040
-                          /* FULL_PROPS, DYNAMIC_SLOTS */
-                        )) : createCommentVNode("v-if", true)
+                        ((_f = componentMap.value[item]) == null ? void 0 : _f.slot) ? renderSlot(_ctx.$slots, `${(_g = componentMap.value[item]) == null ? void 0 : _g.slot}-before`, { key: 0 }) : createCommentVNode("v-if", true),
+                        ((_h = componentMap.value[item]) == null ? void 0 : _h.slot) ? renderSlot(_ctx.$slots, (_i = componentMap.value[item]) == null ? void 0 : _i.slot, { key: 1 }, () => {
+                          var _a2, _b2, _c2;
+                          return [
+                            ((_a2 = componentMap.value[item]) == null ? void 0 : _a2.show) ? (openBlock(), createBlock(
+                              resolveDynamicComponent((_b2 = componentMap.value[item]) == null ? void 0 : _b2.el),
+                              mergeProps({
+                                key: 0,
+                                ref_for: true
+                              }, (_c2 = componentMap.value[item]) == null ? void 0 : _c2.props),
+                              null,
+                              16
+                              /* FULL_PROPS */
+                            )) : createCommentVNode("v-if", true)
+                          ];
+                        }) : createCommentVNode("v-if", true),
+                        ((_j = componentMap.value[item]) == null ? void 0 : _j.slot) ? renderSlot(_ctx.$slots, `${(_k = componentMap.value[item]) == null ? void 0 : _k.slot}-after`, { key: 2 }) : createCommentVNode("v-if", true)
                       ],
                       64
                       /* STABLE_FRAGMENT */
@@ -19792,7 +19923,8 @@ var _sfc_main48 = defineComponent({
               ]), 1032, ["modelValue"]),
               renderSlot(_ctx.$slots, "teek-home-post-after")
             ], 10, _hoisted_319),
-            createBaseVNode("div", {
+            unref(teekConfig).homeCardListPosition ? (openBlock(), createElementBlock("div", {
+              key: 0,
               class: normalizeClass([unref(ns4).e("content__info"), unref(teekConfig).homeCardListPosition === "left" ? unref(ns4).is("left") : unref(ns4).is("right")]),
               "aria-label": unref(t)("tk.home.cardLabel")
             }, [
@@ -19815,7 +19947,7 @@ var _sfc_main48 = defineComponent({
                 1024
                 /* DYNAMIC_SLOTS */
               )
-            ], 10, _hoisted_418)
+            ], 10, _hoisted_418)) : createCommentVNode("v-if", true)
           ],
           2
           /* CLASS */
@@ -19828,6 +19960,7 @@ var _sfc_main48 = defineComponent({
 
 // node_modules/vitepress-theme-teek/es/components/theme/HomeMyCard/src/HomeMyCardScreen.vue2.mjs
 import { withBase as withBase17 } from "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var _hoisted_138 = ["src", "alt"];
 var _hoisted_231 = ["aria-label"];
 var _hoisted_320 = { class: "name" };
@@ -19904,6 +20037,7 @@ var _sfc_main49 = defineComponent({
 
 // node_modules/vitepress-theme-teek/es/components/theme/BodyBgImage/src/index.vue2.mjs
 import { withBase as withBase18 } from "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var _hoisted_139 = {
   key: 0,
   class: "mask"
@@ -19922,7 +20056,10 @@ var _sfc_main50 = defineComponent({
       mask: false,
       maskBg: "rgba(0, 0, 0, 0.2)"
     });
-    const dataArray = computed(() => [bodyBgImgConfig.value.imgSrc || []].flat().map((item) => item && withBase18(item)));
+    const dataArray = computed(() => {
+      const imgSrc = bodyBgImgConfig.value.imgSrc;
+      return [isFunction(imgSrc) ? imgSrc() : imgSrc || []].flat().map((item) => item && withBase18(item));
+    });
     const {
       data: imageSrc,
       start,
@@ -19973,6 +20110,7 @@ var _sfc_main50 = defineComponent({
 
 // node_modules/vitepress-theme-teek/es/components/theme/FooterGroup/src/index.vue2.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var _hoisted_140 = ["name", "href", "title", "target", "aria-label", "aria-describedby"];
 var _hoisted_232 = { class: "sle" };
 var _sfc_main51 = defineComponent({
@@ -20084,6 +20222,7 @@ var _sfc_main51 = defineComponent({
 
 // node_modules/vitepress-theme-teek/es/components/theme/FooterInfo/src/index.vue2.mjs
 import { withBase as withBase19 } from "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 
 // node_modules/vitepress-theme-teek/es/static/img/securityRecord.png.mjs
 var securityRecordImg = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABIAAAASCAYAAABWzo5XAAAACXBIWXMAAAsTAAALEwEAmpwYAAAKTWlDQ1BQaG90b3Nob3AgSUNDIHByb2ZpbGUAAHjanVN3WJP3Fj7f92UPVkLY8LGXbIEAIiOsCMgQWaIQkgBhhBASQMWFiApWFBURnEhVxILVCkidiOKgKLhnQYqIWotVXDjuH9yntX167+3t+9f7vOec5/zOec8PgBESJpHmomoAOVKFPDrYH49PSMTJvYACFUjgBCAQ5svCZwXFAADwA3l4fnSwP/wBr28AAgBw1S4kEsfh/4O6UCZXACCRAOAiEucLAZBSAMguVMgUAMgYALBTs2QKAJQAAGx5fEIiAKoNAOz0ST4FANipk9wXANiiHKkIAI0BAJkoRyQCQLsAYFWBUiwCwMIAoKxAIi4EwK4BgFm2MkcCgL0FAHaOWJAPQGAAgJlCLMwAIDgCAEMeE80DIEwDoDDSv+CpX3CFuEgBAMDLlc2XS9IzFLiV0Bp38vDg4iHiwmyxQmEXKRBmCeQinJebIxNI5wNMzgwAABr50cH+OD+Q5+bk4eZm52zv9MWi/mvwbyI+IfHf/ryMAgQAEE7P79pf5eXWA3DHAbB1v2upWwDaVgBo3/ldM9sJoFoK0Hr5i3k4/EAenqFQyDwdHAoLC+0lYqG9MOOLPv8z4W/gi372/EAe/tt68ABxmkCZrcCjg/1xYW52rlKO58sEQjFu9+cj/seFf/2OKdHiNLFcLBWK8ViJuFAiTcd5uVKRRCHJleIS6X8y8R+W/QmTdw0ArIZPwE62B7XLbMB+7gECiw5Y0nYAQH7zLYwaC5EAEGc0Mnn3AACTv/mPQCsBAM2XpOMAALzoGFyolBdMxggAAESggSqwQQcMwRSswA6cwR28wBcCYQZEQAwkwDwQQgbkgBwKoRiWQRlUwDrYBLWwAxqgEZrhELTBMTgN5+ASXIHrcBcGYBiewhi8hgkEQcgIE2EhOogRYo7YIs4IF5mOBCJhSDSSgKQg6YgUUSLFyHKkAqlCapFdSCPyLXIUOY1cQPqQ28ggMor8irxHMZSBslED1AJ1QLmoHxqKxqBz0XQ0D12AlqJr0Rq0Hj2AtqKn0UvodXQAfYqOY4DRMQ5mjNlhXIyHRWCJWBomxxZj5Vg1Vo81Yx1YN3YVG8CeYe8IJAKLgBPsCF6EEMJsgpCQR1hMWEOoJewjtBK6CFcJg4Qxwicik6hPtCV6EvnEeGI6sZBYRqwm7iEeIZ4lXicOE1+TSCQOyZLkTgohJZAySQtJa0jbSC2kU6Q+0hBpnEwm65Btyd7kCLKArCCXkbeQD5BPkvvJw+S3FDrFiOJMCaIkUqSUEko1ZT/lBKWfMkKZoKpRzame1AiqiDqfWkltoHZQL1OHqRM0dZolzZsWQ8ukLaPV0JppZ2n3aC/pdLoJ3YMeRZfQl9Jr6Afp5+mD9HcMDYYNg8dIYigZaxl7GacYtxkvmUymBdOXmchUMNcyG5lnmA+Yb1VYKvYqfBWRyhKVOpVWlX6V56pUVXNVP9V5qgtUq1UPq15WfaZGVbNQ46kJ1Bar1akdVbupNq7OUndSj1DPUV+jvl/9gvpjDbKGhUaghkijVGO3xhmNIRbGMmXxWELWclYD6yxrmE1iW7L57Ex2Bfsbdi97TFNDc6pmrGaRZp3mcc0BDsax4PA52ZxKziHODc57LQMtPy2x1mqtZq1+rTfaetq+2mLtcu0W7eva73VwnUCdLJ31Om0693UJuja6UbqFutt1z+o+02PreekJ9cr1Dund0Uf1bfSj9Rfq79bv0R83MDQINpAZbDE4Y/DMkGPoa5hpuNHwhOGoEctoupHEaKPRSaMnuCbuh2fjNXgXPmasbxxirDTeZdxrPGFiaTLbpMSkxeS+Kc2Ua5pmutG003TMzMgs3KzYrMnsjjnVnGueYb7ZvNv8jYWlRZzFSos2i8eW2pZ8ywWWTZb3rJhWPlZ5VvVW16xJ1lzrLOtt1ldsUBtXmwybOpvLtqitm63Edptt3xTiFI8p0in1U27aMez87ArsmuwG7Tn2YfYl9m32zx3MHBId1jt0O3xydHXMdmxwvOuk4TTDqcSpw+lXZxtnoXOd8zUXpkuQyxKXdpcXU22niqdun3rLleUa7rrStdP1o5u7m9yt2W3U3cw9xX2r+00umxvJXcM970H08PdY4nHM452nm6fC85DnL152Xlle+70eT7OcJp7WMG3I28Rb4L3Le2A6Pj1l+s7pAz7GPgKfep+Hvqa+It89viN+1n6Zfgf8nvs7+sv9j/i/4XnyFvFOBWABwQHlAb2BGoGzA2sDHwSZBKUHNQWNBbsGLww+FUIMCQ1ZH3KTb8AX8hv5YzPcZyya0RXKCJ0VWhv6MMwmTB7WEY6GzwjfEH5vpvlM6cy2CIjgR2yIuB9pGZkX+X0UKSoyqi7qUbRTdHF09yzWrORZ+2e9jvGPqYy5O9tqtnJ2Z6xqbFJsY+ybuIC4qriBeIf4RfGXEnQTJAntieTE2MQ9ieNzAudsmjOc5JpUlnRjruXcorkX5unOy553PFk1WZB8OIWYEpeyP+WDIEJQLxhP5aduTR0T8oSbhU9FvqKNolGxt7hKPJLmnVaV9jjdO31D+miGT0Z1xjMJT1IreZEZkrkj801WRNberM/ZcdktOZSclJyjUg1plrQr1zC3KLdPZisrkw3keeZtyhuTh8r35CP5c/PbFWyFTNGjtFKuUA4WTC+oK3hbGFt4uEi9SFrUM99m/ur5IwuCFny9kLBQuLCz2Lh4WfHgIr9FuxYji1MXdy4xXVK6ZHhp8NJ9y2jLspb9UOJYUlXyannc8o5Sg9KlpUMrglc0lamUycturvRauWMVYZVkVe9ql9VbVn8qF5VfrHCsqK74sEa45uJXTl/VfPV5bdra3kq3yu3rSOuk626s91m/r0q9akHV0IbwDa0b8Y3lG19tSt50oXpq9Y7NtM3KzQM1YTXtW8y2rNvyoTaj9nqdf13LVv2tq7e+2Sba1r/dd3vzDoMdFTve75TsvLUreFdrvUV99W7S7oLdjxpiG7q/5n7duEd3T8Wej3ulewf2Re/ranRvbNyvv7+yCW1SNo0eSDpw5ZuAb9qb7Zp3tXBaKg7CQeXBJ9+mfHvjUOihzsPcw83fmX+39QjrSHkr0jq/dawto22gPaG97+iMo50dXh1Hvrf/fu8x42N1xzWPV56gnSg98fnkgpPjp2Snnp1OPz3Umdx590z8mWtdUV29Z0PPnj8XdO5Mt1/3yfPe549d8Lxw9CL3Ytslt0utPa49R35w/eFIr1tv62X3y+1XPK509E3rO9Hv03/6asDVc9f41y5dn3m978bsG7duJt0cuCW69fh29u0XdwruTNxdeo94r/y+2v3qB/oP6n+0/rFlwG3g+GDAYM/DWQ/vDgmHnv6U/9OH4dJHzEfVI0YjjY+dHx8bDRq98mTOk+GnsqcTz8p+Vv9563Or59/94vtLz1j82PAL+YvPv655qfNy76uprzrHI8cfvM55PfGm/K3O233vuO+638e9H5ko/ED+UPPR+mPHp9BP9z7nfP78L/eE8/sl0p8zAAAAIGNIUk0AAHolAACAgwAA+f8AAIDpAAB1MAAA6mAAADqYAAAXb5JfxUYAAAQjSURBVHjaVNNZbFRlGIDh95w525zpdGa6TVtbykBbyiICxQY0AhYTJUCiiYqGqEEiJhKQmBg0ESPeeCGRENEYb4jhBr0gNQrRlCBiSgyLaSlSaKEs3Wemy+xnzuqFYdD/6rt6ku/N9wue55EcPwWArCgIgkx5ZRuYVxsnJ801Z05f3jY1MRnb/HxHV+uSph9RKq4mhkdwbZVgdQ2SHkPTwgj/h1QUWWi8/tfg/hM/XN/Y2zfaZnkSnuRDtLMsXhBOvrJtya/LlrcdMs1Qb1lVRQmSAEDAsU1kxpgamXp3y+azu1esreK9dyRqs9PIjkW6OsLx7lTV1ld/237s8HRV57MbnvO8CA+e9GCQFTk6Mza+4/0P+t9a9VSEI3uyTH/eR27aB2Ed31Q/Hx1sI6BHOPT13c5Frd0HW9p3HPUQEwAigJW9RDp+bstrOy981nVGLN/7RpHUV70YfXnEAtjxFPasxPDBQXatjzNTdOQXtg983H/51AFFy1KCIg2bNIdC+8270NwmUmelsXqSqHkDK5PDl8iCW0QcnEW+lqCjvcjQuMZ4YnQRTkotQUZu4GkjcfZNv19G011kXw4vayNYNvqCCvSVTciOgABgeuhBGwhgz5zbkI2ff7HUqJiNR2QktbbSYnBYYqbMT/ilKI4SIbT/GcRylbnvLmJ2X8N7tJ7rR8OE/BbliqEYea81WIotmOs02WFpc55Lf0f5/mSI3dsamOgxSX7ZjaALuBmB6M6FnB+S+POCwmOLk1QFFAqZyQWl1YrpiRZJLvDkygyC5NJ1XCax7xYNiTQVEYVIuUulayIcGeLkpw6WK7GuPY/fb2CkhleXIFFe8XPGaKBj9QxLW1Ik0bg8EuT2zRCJYZvZIYepe0EGbvi4bQUJVZhs2phADFYj+df0lBqJUnaekS4SUHXe3jrOnoE2PhSewHfRpfZGgcryIvfHdQruQlLo7Ns6QizqkJ31CIUlqwQJXuWUpDXj6qOsW32HT3YNImll9FwJsb4jyaLmWQ4fa6a+2sQw0ry8YZSiHcPxxXBtMfCv4XkUCrfliWs/fTE31rtTVfv9vsIorvQIniMhqXM4popVcJFVMHMpfMEaLPdxR1Tnna1b1vl6tGntpAjgCTNWONZyIFBR8Ydtr6EgrCI3VySfzZPLBDHyIq5gkpmzcOUmTGMF+bh7M9LYulfWzMmHBzk7Fpq9deWEYxjrtaCMXjWfstp6BCGNXZzBdYqYhogWqkMum4+oBVD0YnP63u/fFqbv1D+M7VSlBbmmK5uYaLYLYwslfwFVAyXQiOfcx3XyyGIM8DDn0lgWyGokHogu/0UJxpL/+f2e569s/CZQZ53OpzJr0+NXludUfb5jVdf7VUGXJUPIZast1S9PeII6jFDT5xMjFwO1S4c8zwTgnwEAxufYSzA67PMAAAAASUVORK5CYII=";
@@ -20093,7 +20232,7 @@ var _hoisted_141 = ["aria-label"];
 var _hoisted_233 = ["aria-label"];
 var _hoisted_321 = ["href", "title", "aria-label"];
 var _hoisted_420 = { key: 1 };
-var _hoisted_511 = ["innerHTML"];
+var _hoisted_512 = ["innerHTML"];
 var _hoisted_69 = ["aria-label"];
 var _hoisted_77 = ["href", "aria-label"];
 var _hoisted_86 = { key: 2 };
@@ -20190,8 +20329,9 @@ var _sfc_main52 = defineComponent({
               renderList([unref(footerInfo).topMessage || []].flat(), (message2, index2) => {
                 return openBlock(), createElementBlock("p", {
                   key: index2,
-                  innerHTML: message2
-                }, null, 8, _hoisted_511);
+                  innerHTML: message2,
+                  class: "flx-wrap-justify-center"
+                }, null, 8, _hoisted_512);
               }),
               128
               /* KEYED_FRAGMENT */
@@ -20253,7 +20393,8 @@ var _sfc_main52 = defineComponent({
               renderList([unref(footerInfo).bottomMessage || []].flat(), (message2, index2) => {
                 return openBlock(), createElementBlock("p", {
                   key: index2,
-                  innerHTML: message2
+                  innerHTML: message2,
+                  class: "flx-wrap-justify-center"
                 }, null, 8, _hoisted_102);
               }),
               128
@@ -20270,9 +20411,11 @@ var _sfc_main52 = defineComponent({
 
 // node_modules/vitepress-theme-teek/es/components/theme/ArticleImagePreview/src/index.vue2.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 
 // node_modules/vitepress-theme-teek/es/components/common/ImageViewer/src/ImageViewer.vue2.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 
 // node_modules/vitepress-theme-teek/es/components/common/FocusTrap/src/useEscapeKeydown.mjs
 var registeredEscapeHandlers = [];
@@ -20934,7 +21077,7 @@ var _sfc_main54 = defineComponent({
     });
     return (_ctx, _cache) => {
       return openBlock(), createBlock(Teleport, {
-        disabled: !_ctx.teleported,
+        disabled: !__props.teleported,
         to: "body"
       }, [
         createVNode(Transition, {
@@ -20965,7 +21108,7 @@ var _sfc_main54 = defineComponent({
                       "div",
                       {
                         class: normalizeClass(unref(ns4).e("mask")),
-                        onClick: _cache[0] || (_cache[0] = withModifiers(($event) => _ctx.hideOnClickModal && hide(), ["self"]))
+                        onClick: _cache[0] || (_cache[0] = withModifiers(($event) => __props.hideOnClickModal && hide(), ["self"]))
                       },
                       null,
                       2
@@ -21017,7 +21160,7 @@ var _sfc_main54 = defineComponent({
                       64
                       /* STABLE_FRAGMENT */
                     )) : createCommentVNode("v-if", true),
-                    _ctx.$slots.progress || _ctx.showProgress ? (openBlock(), createElementBlock(
+                    _ctx.$slots.progress || __props.showProgress ? (openBlock(), createElementBlock(
                       "div",
                       {
                         key: 1,
@@ -21026,7 +21169,7 @@ var _sfc_main54 = defineComponent({
                       [
                         renderSlot(_ctx.$slots, "progress", {
                           activeIndex: activeIndex.value,
-                          total: _ctx.urlList.length
+                          total: __props.urlList.length
                         }, () => [
                           createTextVNode(
                             toDisplayString(progress.value),
@@ -21116,7 +21259,7 @@ var _sfc_main54 = defineComponent({
                         (openBlock(true), createElementBlock(
                           Fragment,
                           null,
-                          renderList(_ctx.urlList, (url, i) => {
+                          renderList(__props.urlList, (url, i) => {
                             return withDirectives((openBlock(), createElementBlock("img", {
                               ref_for: true,
                               ref: (el) => imgRefs.value[i] = el,
@@ -21124,7 +21267,7 @@ var _sfc_main54 = defineComponent({
                               src: url,
                               style: normalizeStyle(imgStyle.value),
                               class: normalizeClass([unref(ns4).e("img"), "image-viewer__img"]),
-                              crossorigin: _ctx.crossorigin,
+                              crossorigin: __props.crossorigin,
                               onLoad: handleImgLoad,
                               onError: handleImgError,
                               onMousedown: handleMouseDown
@@ -21231,18 +21374,22 @@ var _sfc_main56 = defineComponent({
 
 // node_modules/vitepress-theme-teek/es/components/theme/ArticleAnalyze/src/index.vue2.mjs
 import { useData as useData20 } from "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 
 // node_modules/vitepress-theme-teek/es/components/theme/ArticleBreadcrumb/src/index.vue2.mjs
 import { useData as useData19, withBase as withBase20 } from "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 
 // node_modules/vitepress-theme-teek/es/components/common/Breadcrumb/src/Breadcrumb.vue2.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 
 // node_modules/vitepress-theme-teek/es/components/common/Breadcrumb/src/breadcrumb.mjs
 var breadcrumbKey = Symbol("breadcrumbKey");
 
 // node_modules/vitepress-theme-teek/es/components/common/Breadcrumb/src/namespace.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var ns = useNamespace("breadcrumb");
 
 // node_modules/vitepress-theme-teek/es/components/common/Breadcrumb/src/Breadcrumb.vue2.mjs
@@ -21340,7 +21487,7 @@ var _sfc_main59 = defineComponent({
       separator: "/",
       homeLabel: t("tk.articleBreadcrumb.home")
     });
-    const relativePathArr = computed(() => page.value.relativePath.split("/") || []);
+    const relativePathArr = computed(() => page.value.filePath.split("/") || []);
     const breadcrumbList = computed(() => {
       const classifyList = [];
       const relativePathArrConst = relativePathArr.value;
@@ -21350,7 +21497,7 @@ var _sfc_main59 = defineComponent({
         if ((index2 !== relativePathArrConst.length - 1 || breadcrumb.value.showCurrentName) && fileName !== localeIndex.value) {
           classifyList.push({
             fileName,
-            filePath: ((_c = (_b = theme.value.catalogues) == null ? void 0 : _b.inv[item]) == null ? void 0 : _c.filePath) || ""
+            url: ((_c = (_b = theme.value.catalogues) == null ? void 0 : _b.inv[item]) == null ? void 0 : _c.url) || ""
           });
         }
       });
@@ -21358,13 +21505,13 @@ var _sfc_main59 = defineComponent({
     });
     return (_ctx, _cache) => {
       var _a;
-      return openBlock(), createElementBlock("div", {
-        class: normalizeClass(`${unref(ns4).b()}`),
+      return ((_a = unref(breadcrumb)) == null ? void 0 : _a.enabled) ? (openBlock(), createElementBlock("div", {
+        key: 0,
+        class: normalizeClass(unref(ns4).b()),
         role: "navigation",
         "aria-label": unref(t)("tk.articleBreadcrumb.label")
       }, [
-        ((_a = unref(breadcrumb)) == null ? void 0 : _a.enabled) ? (openBlock(), createBlock(unref(_sfc_main57), {
-          key: 0,
+        createVNode(unref(_sfc_main57), {
           separator: unref(breadcrumb).separator
         }, {
           default: withCtx(() => [
@@ -21394,10 +21541,10 @@ var _sfc_main59 = defineComponent({
                   { key: index2 },
                   {
                     default: withCtx(() => [
-                      (openBlock(), createBlock(resolveDynamicComponent(item.filePath ? "a" : "span"), {
-                        href: item.filePath && unref(withBase20)(`/${item.filePath}`),
+                      (openBlock(), createBlock(resolveDynamicComponent(item.url ? "a" : "span"), {
+                        href: item.url && unref(withBase20)(`/${item.url}`),
                         title: item.fileName,
-                        class: normalizeClass([item.filePath ? "hover-color" : ""]),
+                        class: normalizeClass([item.url ? "hover-color" : ""]),
                         "aria-label": item.fileName
                       }, {
                         default: withCtx(() => [
@@ -21424,8 +21571,8 @@ var _sfc_main59 = defineComponent({
           ]),
           _: 1
           /* STABLE */
-        }, 8, ["separator"])) : createCommentVNode("v-if", true)
-      ], 10, _hoisted_144);
+        }, 8, ["separator"])
+      ], 10, _hoisted_144)) : createCommentVNode("v-if", true);
     };
   }
 });
@@ -21441,7 +21588,7 @@ var _hoisted_421 = {
   key: 1,
   class: "flx-center"
 };
-var _hoisted_512 = ["title", "aria-label"];
+var _hoisted_513 = ["title", "aria-label"];
 var _hoisted_610 = {
   key: 2,
   class: "flx-center"
@@ -21450,6 +21597,10 @@ var _hoisted_78 = ["title", "aria-label"];
 var _sfc_main60 = defineComponent({
   ...{ name: "ArticleAnalyze" },
   __name: "index",
+  props: {
+    breadcrumb: { type: Boolean, default: true },
+    scope: { default: "article" }
+  },
   setup(__props) {
     const ns4 = useNamespace("article-analyze");
     const { t } = useLocale();
@@ -21461,14 +21612,15 @@ var _sfc_main60 = defineComponent({
       author: getTeekConfig("author", {}),
       date: frontmatter.value.date,
       frontmatter: frontmatter.value,
-      url: ""
+      url: "",
+      relativePath: ""
     }));
     const docAnalysisInfo = computed(() => theme.value.docAnalysisInfo || {});
     const pageViewInfo = computed(() => {
       var _a;
       let pageViewInfo2 = {};
       (_a = docAnalysisInfo.value.eachFileWords) == null ? void 0 : _a.forEach((item) => {
-        if (item.fileInfo.relativePath === router.route.data.relativePath) pageViewInfo2 = item;
+        if (item.fileInfo.relativePath === router.route.data.filePath) pageViewInfo2 = item;
       });
       return pageViewInfo2;
     });
@@ -21532,11 +21684,11 @@ var _sfc_main60 = defineComponent({
         class: normalizeClass(`${unref(ns4).b()} flx-justify-between`),
         "aria-label": unref(t)("tk.articleAnalyze.label")
       }, [
-        createVNode(unref(_sfc_main59)),
+        __props.breadcrumb ? (openBlock(), createBlock(unref(_sfc_main59), { key: 0 })) : createCommentVNode("v-if", true),
         isShowInfo.value ? (openBlock(), createElementBlock(
           "div",
           {
-            key: 0,
+            key: 1,
             ref_key: "baseInfoRef",
             ref: baseInfoRef,
             class: normalizeClass(`${unref(ns4).e("wrapper")} flx-align-center`)
@@ -21544,9 +21696,9 @@ var _sfc_main60 = defineComponent({
           [
             createVNode(unref(_sfc_main28), {
               post: post.value,
-              scope: "article"
-            }, null, 8, ["post"]),
-            unref(docAnalysisConfig).wordCount || pageViewInfo.value.wordCount ? (openBlock(), createElementBlock("div", _hoisted_235, [
+              scope: __props.scope
+            }, null, 8, ["post", "scope"]),
+            unref(docAnalysisConfig).wordCount && pageViewInfo.value.wordCount ? (openBlock(), createElementBlock("div", _hoisted_235, [
               unref(articleConfig).showIcon ? (openBlock(), createBlock(unref(_sfc_main14), {
                 key: 0,
                 icon: unref(readingIcon),
@@ -21558,7 +21710,7 @@ var _sfc_main60 = defineComponent({
                 "aria-label": unref(t)("tk.articleAnalyze.wordCount")
               }, toDisplayString(pageViewInfo.value.wordCount), 9, _hoisted_322)
             ])) : createCommentVNode("v-if", true),
-            unref(docAnalysisConfig).readingTime || pageViewInfo.value.readingTime ? (openBlock(), createElementBlock("div", _hoisted_421, [
+            unref(docAnalysisConfig).readingTime && pageViewInfo.value.readingTime ? (openBlock(), createElementBlock("div", _hoisted_421, [
               unref(articleConfig).showIcon ? (openBlock(), createBlock(unref(_sfc_main14), {
                 key: 0,
                 icon: unref(clockIcon)
@@ -21567,7 +21719,7 @@ var _sfc_main60 = defineComponent({
                 title: unref(t)("tk.articleAnalyze.readingTime"),
                 class: "hover-color",
                 "aria-label": unref(t)("tk.articleAnalyze.readingTime")
-              }, toDisplayString(pageViewInfo.value.readingTime), 9, _hoisted_512)
+              }, toDisplayString(pageViewInfo.value.readingTime), 9, _hoisted_513)
             ])) : createCommentVNode("v-if", true),
             usePageView.value ? (openBlock(), createElementBlock("div", _hoisted_610, [
               unref(articleConfig).showIcon ? (openBlock(), createBlock(unref(_sfc_main14), {
@@ -21591,6 +21743,7 @@ var _sfc_main60 = defineComponent({
 
 // node_modules/vitepress-theme-teek/es/components/theme/ArticleShare/src/index.vue2.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var _hoisted_146 = ["aria-label"];
 var _hoisted_236 = {
   key: 0,
@@ -21665,7 +21818,8 @@ var _sfc_main61 = defineComponent({
 });
 
 // node_modules/vitepress-theme-teek/es/components/theme/ArticleUpdate/src/index.vue2.mjs
-import { useRoute as useRoute3, useData as useData21, withBase as withBase21 } from "vitepress";
+import { useRoute as useRoute4, useData as useData21, withBase as withBase21 } from "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var _hoisted_147 = ["href", "aria-label"];
 var _hoisted_237 = { key: 1 };
 var _hoisted_324 = ["href", "aria-label"];
@@ -21676,7 +21830,7 @@ var _sfc_main62 = defineComponent({
     const ns4 = useNamespace("article-update");
     const { t } = useLocale();
     const posts = usePosts();
-    const route = useRoute3();
+    const route = useRoute4();
     const { frontmatter } = useData21();
     const { getTeekConfigRef } = useTeekConfig();
     const { archivesPath } = usePagePath();
@@ -21684,7 +21838,7 @@ var _sfc_main62 = defineComponent({
       limit: 3
     });
     const updatePosts = computed(() => {
-      const path = "/" + route.data.relativePath.replace(".md", "");
+      const path = "/" + route.data.filePath.replace(".md", "");
       return [
         ...posts.value.sortPostsByDate.filter((item) => ![route.path, path, `${path}.html`].includes(item.url)).slice(0, articleConfig.value.limit),
         { title: "更多文章 >", url: archivesPath.value, frontmatter: {}, date: "" }
@@ -21791,7 +21945,8 @@ var _sfc_main62 = defineComponent({
 });
 
 // node_modules/vitepress-theme-teek/es/components/theme/ArticleHeadingHighlight/src/index.vue2.mjs
-import { useRoute as useRoute4 } from "vitepress";
+import { useRoute as useRoute5 } from "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var _sfc_main63 = defineComponent({
   __name: "index",
   setup(__props) {
@@ -21815,7 +21970,7 @@ var _sfc_main63 = defineComponent({
         if (elem) elem.classList.add(ns4.b());
       }, 10);
     };
-    const route = useRoute4();
+    const route = useRoute5();
     watch(route, async () => {
       await nextTick();
       handleHighlight();
@@ -21829,6 +21984,7 @@ var _sfc_main63 = defineComponent({
 
 // node_modules/vitepress-theme-teek/es/components/theme/ArticlePageStyle/src/index.vue2.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var _sfc_main64 = defineComponent({
   __name: "index",
   setup(__props) {
@@ -21857,6 +22013,7 @@ var _sfc_main64 = defineComponent({
 
 // node_modules/vitepress-theme-teek/es/components/theme/ArticleAppreciation/src/AsideBottomAppreciation.vue2.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var _hoisted_148 = ["aria-label"];
 var _hoisted_238 = ["innerHTML"];
 var _hoisted_325 = ["innerHTML"];
@@ -21888,11 +22045,12 @@ var _sfc_main65 = defineComponent({
 
 // node_modules/vitepress-theme-teek/es/components/theme/ArticleAppreciation/src/DocAfterAppreciation.vue2.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var _hoisted_149 = ["aria-label"];
 var _hoisted_239 = ["innerHTML", "aria-expanded", "aria-controls"];
 var _hoisted_326 = ["aria-expanded", "aria-controls"];
 var _hoisted_422 = ["innerHTML"];
-var _hoisted_513 = ["innerHTML"];
+var _hoisted_514 = ["innerHTML"];
 var _hoisted_611 = ["aria-label"];
 var _hoisted_79 = ["innerHTML"];
 var _sfc_main66 = defineComponent({
@@ -21952,7 +22110,7 @@ var _sfc_main66 = defineComponent({
           }, null, 8, _hoisted_422)) : (openBlock(), createElementBlock("span", {
             key: 2,
             innerHTML: docAfterOptions.value.expandTitle
-          }, null, 8, _hoisted_513))
+          }, null, 8, _hoisted_514))
         ], 10, _hoisted_326)) : createCommentVNode("v-if", true),
         createVNode(Transition, {
           name: unref(ns4).join("fade")
@@ -21979,9 +22137,11 @@ var _sfc_main66 = defineComponent({
 
 // node_modules/vitepress-theme-teek/es/components/theme/ArticleAppreciation/src/DocAfterAppreciationPopper.vue2.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 
 // node_modules/vitepress-theme-teek/es/components/common/Popover/src/index.vue2.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 
 // node_modules/vitepress-theme-teek/es/components/common/Popover/src/useFocusTrap.mjs
 var useFocusTrap = (visible, emit) => {
@@ -22155,17 +22315,17 @@ var _sfc_main67 = defineComponent({
             to: `#${unref(popoverContainerId)}`
           }, [
             createVNode(Transition, {
-              name: _ctx.transition ? _ctx.transitionName || unref(ns4).join("fade-linear") : ""
+              name: __props.transition ? __props.transitionName || unref(ns4).join("fade-linear") : ""
             }, {
               default: withCtx(() => [
-                !_ctx.disabled ? withDirectives((openBlock(), createElementBlock(
+                !__props.disabled ? withDirectives((openBlock(), createElementBlock(
                   "div",
                   {
                     key: 0,
                     ref_key: "popoverRef",
                     ref: popoverRef,
                     style: normalizeStyle(popupStyle.value),
-                    class: normalizeClass([unref(ns4).b(), _ctx.popperClass]),
+                    class: normalizeClass([unref(ns4).b(), __props.popperClass]),
                     onClick: _cache[4] || (_cache[4] = withModifiers(() => {
                     }, ["stop"])),
                     onTouchstart: _cache[5] || (_cache[5] = withModifiers(() => {
@@ -22186,7 +22346,7 @@ var _sfc_main67 = defineComponent({
                       default: withCtx(() => [
                         renderSlot(_ctx.$slots, "default", {}, () => [
                           createTextVNode(
-                            toDisplayString(_ctx.content),
+                            toDisplayString(__props.content),
                             1
                             /* TEXT */
                           )
@@ -22219,7 +22379,7 @@ var _hoisted_150 = ["aria-label"];
 var _hoisted_240 = ["innerHTML", "aria-expanded", "aria-controls"];
 var _hoisted_327 = ["aria-expanded", "aria-controls"];
 var _hoisted_423 = ["innerHTML"];
-var _hoisted_514 = ["aria-label"];
+var _hoisted_515 = ["aria-label"];
 var _hoisted_612 = ["innerHTML"];
 var _sfc_main68 = defineComponent({
   ...{ name: "DocAfterAppreciationPopper" },
@@ -22285,7 +22445,7 @@ var _sfc_main68 = defineComponent({
                 class: normalizeClass(unref(ns4).e("content")),
                 innerHTML: docAfterPopperOptions.value.content
               }, null, 10, _hoisted_612)
-            ], 10, _hoisted_514)
+            ], 10, _hoisted_515)
           ]),
           _: 1
           /* STABLE */
@@ -22297,6 +22457,12 @@ var _sfc_main68 = defineComponent({
 
 // node_modules/vitepress-theme-teek/es/components/theme/CommentTwikoo/src/index.vue2.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
+
+// node_modules/vitepress-theme-teek/es/components/theme/CommentTwikoo/src/twikoo.mjs
+var twikooContext = Symbol("twikoo");
+
+// node_modules/vitepress-theme-teek/es/components/theme/CommentTwikoo/src/index.vue2.mjs
 var _hoisted_151 = ["href", "integrity"];
 var _sfc_main69 = defineComponent({
   ...{ name: "CommentTwikoo" },
@@ -22311,7 +22477,7 @@ var _sfc_main69 = defineComponent({
       jsLink = "https://cdn.jsdelivr.net/npm/twikoo@{version}/dist/twikoo.nocss.js",
       jsIntegrity,
       cssLink = "https://cdn.jsdelivr.net/npm/twikoo@{version}/dist/twikoo.css",
-      version: version2 = "1.6.42",
+      version: version2 = "1.6.44",
       katex,
       timeout = 700,
       ...options
@@ -22319,7 +22485,10 @@ var _sfc_main69 = defineComponent({
     const initTwikoo = () => {
       if (!isClient) return console.error("[Teek Error] Not in a client");
       if (!envId) return console.error("[Teek Error] Twikoo initialization failed. Please configure the 'envId'");
-      if (window.twikoo) window.twikoo.init({ ...options, envId, el: "#twikoo" });
+      const getTwikooInstance = inject(twikooContext, () => null);
+      const twikooOption = { ...options, envId };
+      if (getTwikooInstance) getTwikooInstance("#twikoo", twikooOption);
+      else if (window.twikoo) window.twikoo.init({ ...twikooOption, el: "#twikoo" });
     };
     const twikooJs = ref(null);
     const initJs = () => {
@@ -22386,7 +22555,7 @@ var _sfc_main69 = defineComponent({
             { id: "twikoo" },
             null,
             -1
-            /* HOISTED */
+            /* CACHED */
           )),
           (openBlock(), createBlock(resolveDynamicComponent("script"), {
             src: unref(jsLink).replace("{version}", unref(version2)),
@@ -22405,6 +22574,7 @@ var _sfc_main69 = defineComponent({
 
 // node_modules/vitepress-theme-teek/es/components/theme/CommentArtalk/src/index.vue2.mjs
 import { useData as useData22 } from "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 
 // node_modules/vitepress-theme-teek/es/components/theme/CommentArtalk/src/artalk.mjs
 var artalkContext = Symbol("artalk");
@@ -22525,6 +22695,7 @@ var _sfc_main70 = defineComponent({
 
 // node_modules/vitepress-theme-teek/es/components/theme/CommentGiscus/src/index.vue2.mjs
 import { useData as useData23 } from "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 
 // node_modules/vitepress-theme-teek/es/components/theme/CommentGiscus/src/giscus.mjs
 var giscusContext = Symbol("giscus");
@@ -22629,6 +22800,7 @@ var _sfc_main71 = defineComponent({
 
 // node_modules/vitepress-theme-teek/es/components/theme/CommentWaline/src/index.vue2.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 
 // node_modules/vitepress-theme-teek/es/components/theme/CommentWaline/src/waline.mjs
 var walineContext = Symbol("waline");
@@ -22699,6 +22871,7 @@ var _sfc_main72 = defineComponent({
 
 // node_modules/vitepress-theme-teek/es/components/theme/CodeBlockToggle/src/index.vue2.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 
 // node_modules/vitepress-theme-teek/es/components/theme/CodeBlockToggle/src/Overlay.vue2.mjs
 var _sfc_main73 = defineComponent({
@@ -22717,7 +22890,7 @@ var _sfc_main73 = defineComponent({
           null,
           "查看更多",
           -1
-          /* HOISTED */
+          /* CACHED */
         )),
         createVNode(unref(_sfc_main14), {
           class: "overlay-icon",
@@ -22746,18 +22919,23 @@ var _sfc_main74 = defineComponent({
     const ns4 = useNamespace();
     const { getTeekConfigRef } = useTeekConfig();
     const codeBlockConfig = getTeekConfigRef("codeBlock", {
+      enabled: true,
       collapseHeight: 700,
       copiedDone: void 0,
       overlay: false,
-      overlayHeight: 400
+      overlayHeight: 400,
+      langTextTransform: ""
     });
     watch(
       codeBlockConfig,
       (newVal) => {
         if (!isClient) return;
-        const { disabled } = newVal || {};
-        if (disabled) return document.documentElement.removeAttribute(documentAttribute);
+        const { enabled = true, langTextTransform } = newVal || {};
+        if (!enabled) return document.documentElement.removeAttribute(documentAttribute);
         document.documentElement.setAttribute(documentAttribute, ns4.namespace);
+        if (langTextTransform) {
+          document.documentElement.style.setProperty(ns4.cssVarName("code-block-lang-transform"), langTextTransform);
+        }
         nextTick(() => initCodeBlock());
       },
       { immediate: true }
@@ -22892,12 +23070,17 @@ var touchMedia = "(pointer: coarse)";
 var layoutModeAttribute = "layout-mode";
 var themeColorAttribute = "theme-color";
 
+// node_modules/vitepress-theme-teek/es/components/theme/RightBottomButton/src/index.vue2.mjs
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
+
 // node_modules/vitepress-theme-teek/es/components/theme/RightBottomButton/src/namespace.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var ns2 = useNamespace("right-bottom-button");
 
 // node_modules/vitepress-theme-teek/es/components/theme/RightBottomButton/src/BackTop.vue2.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var _hoisted_154 = ["title", "aria-label", "aria-valuenow"];
 var _hoisted_241 = {
   key: 0,
@@ -22989,6 +23172,7 @@ var _sfc_main75 = defineComponent({
 
 // node_modules/vitepress-theme-teek/es/components/theme/RightBottomButton/src/ToComment.vue2.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var _hoisted_155 = ["title", "aria-label"];
 var _sfc_main76 = defineComponent({
   ...{ name: "ToComment" },
@@ -22996,7 +23180,7 @@ var _sfc_main76 = defineComponent({
   setup(__props) {
     const { t } = useLocale();
     const { getTeekConfigRef } = useTeekConfig();
-    const toCommentConfig = getTeekConfigRef("toComment");
+    const toCommentConfig = getTeekConfigRef("toComment", {});
     const scrollTop = ref(0);
     const showToComment = computed(() => {
       var _a, _b;
@@ -23060,9 +23244,11 @@ var _sfc_main76 = defineComponent({
 
 // node_modules/vitepress-theme-teek/es/components/theme/RightBottomButton/src/ThemeColor.vue2.mjs
 import { useData as useData24 } from "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 
 // node_modules/vitepress-theme-teek/es/components/theme/ThemeEnhance/src/namespace.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var ns3 = useNamespace("theme-enhance");
 var transitionName = ns3.join("theme-enhance-slide");
 var pageMaxWidthVar = ns3.cssVarName("page-max-width");
@@ -23077,6 +23263,7 @@ var spotlightStyleStorageKey = ns3.storageKey("spotlightStyle");
 
 // node_modules/vitepress-theme-teek/es/components/theme/ThemeEnhance/src/useThemeColorList.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var useThemeColorList = () => {
   if (!isClient) return;
   const { getTeekConfigRef } = useTeekConfig();
@@ -23303,6 +23490,13 @@ var _sfc_main78 = defineComponent({
     const commentConfig = computed(() => {
       const comment = frontmatter.value.comment ?? teekConfig.value.comment;
       if (isBoolean(comment)) return { enabled: comment };
+      const getArtalkInstance = inject(artalkContext, null);
+      const getGiscusInstance = inject(giscusContext, null);
+      const getTwikooInstance = inject(twikooContext, null);
+      const getWalineInstance = inject(walineContext, null);
+      if (getArtalkInstance || getGiscusInstance || getTwikooInstance || getWalineInstance) {
+        return { enabled: true };
+      }
       return { enabled: true, provider: comment.provider };
     });
     const isMobile = useMediaQuery(mobileMaxWidthMedia);
@@ -23328,7 +23522,7 @@ var _sfc_main78 = defineComponent({
             _: 3
             /* FORWARDED */
           })) : createCommentVNode("v-if", true),
-          unref(toCommentConfig).enabled && commentConfig.value.enabled && commentConfig.value.provider ? (openBlock(), createBlock(_sfc_main76, { key: 1 }, {
+          unref(toCommentConfig).enabled && (commentConfig.value.enabled || commentConfig.value.provider) ? (openBlock(), createBlock(_sfc_main76, { key: 1 }, {
             default: withCtx((scope) => [
               renderSlot(_ctx.$slots, "teek-to-comment", normalizeProps(guardReactiveProps(scope)))
             ]),
@@ -23347,11 +23541,12 @@ var _sfc_main78 = defineComponent({
 
 // node_modules/vitepress-theme-teek/es/components/theme/Notice/src/index.vue2.mjs
 import { useData as useData26 } from "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var _hoisted_157 = ["aria-label"];
 var _hoisted_243 = ["aria-label"];
 var _hoisted_328 = ["aria-label"];
 var _hoisted_424 = { class: "flx-align-center" };
-var _hoisted_515 = {
+var _hoisted_516 = {
   id: "notice-title",
   class: "title sle"
 };
@@ -23527,7 +23722,7 @@ var _sfc_main79 = defineComponent({
                   }, null, 8, ["icon"]),
                   createBaseVNode(
                     "span",
-                    _hoisted_515,
+                    _hoisted_516,
                     toDisplayString(noticeTitle.value),
                     1
                     /* TEXT */
@@ -23576,15 +23771,19 @@ var _sfc_main79 = defineComponent({
 
 // node_modules/vitepress-theme-teek/es/components/theme/ThemeEnhance/src/index.vue2.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 
 // node_modules/vitepress-theme-teek/es/components/theme/ThemeEnhance/src/LayoutSwitch.vue2.mjs
 import { useData as useData27 } from "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 
 // node_modules/vitepress-theme-teek/es/components/common/Segmented/src/Segmented.vue2.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 
 // node_modules/vitepress-theme-teek/es/components/common/Segmented/src/SegmentedItem.vue2.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var _hoisted_158 = ["title", "disabled"];
 var _hoisted_244 = ["value", "name", "disabled", "checked", "aria-checked"];
 var _hoisted_329 = { key: 1 };
@@ -23608,18 +23807,18 @@ var _sfc_main80 = defineComponent({
     const model = useModel(__props, "modelValue");
     return (_ctx, _cache) => {
       return openBlock(), createElementBlock("label", {
-        class: normalizeClass([unref(ns4).b(), unref(ns4).is("active", model.value === _ctx.value && !_ctx.disabled), unref(ns4).is("disabled", _ctx.disabled)]),
-        title: _ctx.title,
-        disabled: _ctx.disabled
+        class: normalizeClass([unref(ns4).b(), unref(ns4).is("active", model.value === __props.value && !__props.disabled), unref(ns4).is("disabled", __props.disabled)]),
+        title: __props.title,
+        disabled: __props.disabled
       }, [
         withDirectives(createBaseVNode("input", {
           "onUpdate:modelValue": _cache[0] || (_cache[0] = ($event) => model.value = $event),
           type: "radio",
-          value: _ctx.value,
-          name: _ctx.name,
-          disabled: _ctx.disabled,
-          checked: model.value === _ctx.value,
-          "aria-checked": model.value === _ctx.value,
+          value: __props.value,
+          name: __props.name,
+          disabled: __props.disabled,
+          checked: model.value === __props.value,
+          "aria-checked": model.value === __props.value,
           role: "radio",
           style: { "display": "none" }
         }, null, 8, _hoisted_244), [
@@ -23631,15 +23830,15 @@ var _sfc_main80 = defineComponent({
             class: normalizeClass(unref(ns4).e("content"))
           },
           [
-            _ctx.icon ? (openBlock(), createBlock(unref(_sfc_main14), {
+            __props.icon ? (openBlock(), createBlock(unref(_sfc_main14), {
               key: 0,
-              icon: _ctx.icon,
+              icon: __props.icon,
               "aria-hidden": "true"
             }, null, 8, ["icon"])) : createCommentVNode("v-if", true),
-            _ctx.label ? (openBlock(), createElementBlock(
+            __props.label ? (openBlock(), createElementBlock(
               "span",
               _hoisted_329,
-              toDisplayString(_ctx.label),
+              toDisplayString(__props.label),
               1
               /* TEXT */
             )) : createCommentVNode("v-if", true)
@@ -23677,13 +23876,12 @@ var _sfc_main81 = defineComponent({
           (openBlock(true), createElementBlock(
             Fragment,
             null,
-            renderList(_ctx.options, (option) => {
+            renderList(__props.options, (option) => {
               return openBlock(), createBlock(_sfc_main80, mergeProps({
                 key: option.name,
                 modelValue: model.value,
-                "onUpdate:modelValue": _cache[0] || (_cache[0] = ($event) => model.value = $event),
-                ref_for: true
-              }, option, { disabled: _ctx.disabled }), null, 16, ["modelValue", "disabled"]);
+                "onUpdate:modelValue": _cache[0] || (_cache[0] = ($event) => model.value = $event)
+              }, { ref_for: true }, option, { disabled: __props.disabled }), null, 16, ["modelValue", "disabled"]);
             }),
             128
             /* KEYED_FRAGMENT */
@@ -23698,6 +23896,7 @@ var _sfc_main81 = defineComponent({
 
 // node_modules/vitepress-theme-teek/es/components/theme/ThemeEnhance/src/useAnimated.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var useAnimated = (delay = 1e3, immediate = false) => {
   let timer = null;
   const stop = () => {
@@ -23736,21 +23935,21 @@ var _sfc_main82 = defineComponent({
       return openBlock(), createElementBlock(
         "div",
         {
-          class: normalizeClass([unref(ns3).e("title"), unref(ns3).is("disabled", !!_ctx.disabled)])
+          class: normalizeClass([unref(ns3).e("title"), unref(ns3).is("disabled", !!__props.disabled)])
         },
         [
           renderSlot(_ctx.$slots, "icon", {}, () => [
-            _ctx.icon ? (openBlock(), createBlock(unref(_sfc_main14), {
+            __props.icon ? (openBlock(), createBlock(unref(_sfc_main14), {
               key: 0,
-              icon: _ctx.icon,
+              icon: __props.icon,
               size: 16
             }, null, 8, ["icon"])) : createCommentVNode("v-if", true)
           ]),
           renderSlot(_ctx.$slots, "default", {}, () => [
-            _ctx.title ? (openBlock(), createElementBlock(
+            __props.title ? (openBlock(), createElementBlock(
               "span",
               _hoisted_159,
-              toDisplayString(_ctx.title),
+              toDisplayString(__props.title),
               1
               /* TEXT */
             )) : createCommentVNode("v-if", true)
@@ -23785,7 +23984,7 @@ var _sfc_main83 = defineComponent({
         class: normalizeClass(unref(ns3).e("helper")),
         modelValue: popoverVisible.value,
         "onUpdate:modelValue": _cache[0] || (_cache[0] = ($event) => popoverVisible.value = $event),
-        "trigger-el": _ctx.triggerEl,
+        "trigger-el": __props.triggerEl,
         placement: "left-start"
       }, {
         reference: withCtx(() => [
@@ -23816,6 +24015,7 @@ var _sfc_main83 = defineComponent({
 
 // node_modules/vitepress-theme-teek/es/components/theme/ThemeEnhance/src/components/BorderHighlight.vue2.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var _sfc_main84 = defineComponent({
   ...{ name: "BorderHighlight" },
   __name: "BorderHighlight",
@@ -23828,7 +24028,7 @@ var _sfc_main84 = defineComponent({
       return openBlock(), createElementBlock(
         "div",
         {
-          class: normalizeClass([unref(ns4).b(), unref(ns4).is("active", Boolean(_ctx.active))])
+          class: normalizeClass([unref(ns4).b(), unref(ns4).is("active", Boolean(__props.active))])
         },
         [
           renderSlot(_ctx.$slots, "default")
@@ -23880,10 +24080,10 @@ var _sfc_main85 = defineComponent({
           },
           [
             createVNode(_sfc_main82, {
-              title: _ctx.title,
-              icon: _ctx.icon,
-              disabled: _ctx.disabled,
-              "aria-label": _ctx.title
+              title: __props.title,
+              icon: __props.icon,
+              disabled: __props.disabled,
+              "aria-label": __props.title
             }, {
               default: withCtx(() => [
                 renderSlot(_ctx.$slots, "title")
@@ -23891,7 +24091,7 @@ var _sfc_main85 = defineComponent({
               _: 3
               /* FORWARDED */
             }, 8, ["title", "icon", "disabled", "aria-label"]),
-            _ctx.helper ? (openBlock(), createBlock(_sfc_main83, {
+            __props.helper ? (openBlock(), createBlock(_sfc_main83, {
               key: 0,
               modelValue: helperVisible.value,
               "onUpdate:modelValue": _cache[0] || (_cache[0] = ($event) => helperVisible.value = $event),
@@ -23912,7 +24112,7 @@ var _sfc_main85 = defineComponent({
                       [
                         renderSlot(_ctx.$slots, "helper-title", {}, () => [
                           createTextVNode(
-                            toDisplayString(_ctx.title),
+                            toDisplayString(__props.title),
                             1
                             /* TEXT */
                           )
@@ -23929,7 +24129,7 @@ var _sfc_main85 = defineComponent({
                       [
                         renderSlot(_ctx.$slots, "helper-desc", {}, () => [
                           createTextVNode(
-                            toDisplayString(_ctx.helperDesc),
+                            toDisplayString(__props.helperDesc),
                             1
                             /* TEXT */
                           )
@@ -23941,7 +24141,7 @@ var _sfc_main85 = defineComponent({
                     (openBlock(true), createElementBlock(
                       Fragment,
                       null,
-                      renderList(_ctx.tips, (tip, index2) => {
+                      renderList(__props.tips, (tip, index2) => {
                         return openBlock(), createElementBlock(
                           "div",
                           {
@@ -23991,7 +24191,7 @@ var _sfc_main85 = defineComponent({
           512
           /* NEED_PATCH */
         ),
-        _ctx.borderHighlight ? (openBlock(), createBlock(_sfc_main84, {
+        __props.borderHighlight ? (openBlock(), createBlock(_sfc_main84, {
           key: 0,
           active: helperVisible.value,
           style: { "margin-top": "8px" }
@@ -24126,9 +24326,11 @@ var _sfc_main86 = defineComponent({
 
 // node_modules/vitepress-theme-teek/es/components/theme/ThemeEnhance/src/LayoutPageWidthSlide.vue2.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 
 // node_modules/vitepress-theme-teek/es/components/common/InputSlide/src/index.vue2.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var _hoisted_161 = ["name", "min", "max", "disabled", "step"];
 var _sfc_main87 = defineComponent({
   ...{ name: "InputSlide" },
@@ -24233,12 +24435,12 @@ var _sfc_main87 = defineComponent({
                 ref: inputSliderRef,
                 "onUpdate:modelValue": _cache[0] || (_cache[0] = ($event) => inputValue.value = $event),
                 type: "range",
-                name: _ctx.name,
-                min: _ctx.min,
-                max: _ctx.max,
-                disabled: _ctx.disabled,
-                step: _ctx.step,
-                class: normalizeClass([unref(ns4).e("label__input"), unref(ns4).e("label__input-progress"), unref(ns4).is("disabled", _ctx.disabled)])
+                name: __props.name,
+                min: __props.min,
+                max: __props.max,
+                disabled: __props.disabled,
+                step: __props.step,
+                class: normalizeClass([unref(ns4).e("label__input"), unref(ns4).e("label__input-progress"), unref(ns4).is("disabled", __props.disabled)])
               }, null, 10, _hoisted_161), [
                 [
                   vModelText,
@@ -24259,7 +24461,7 @@ var _sfc_main87 = defineComponent({
                       ref: inputSliderTooltipRef,
                       class: normalizeClass([unref(ns4).e("label__tooltip"), unref(ns4).is("opacity-0", unref(hovering) && positioning.value)])
                     },
-                    toDisplayString(!!_ctx.format ? _ctx.format(inputValue.value) : inputValue.value),
+                    toDisplayString(!!__props.format ? __props.format(inputValue.value) : inputValue.value),
                     3
                     /* TEXT, CLASS */
                   ), [
@@ -24366,6 +24568,7 @@ var _sfc_main88 = defineComponent({
 
 // node_modules/vitepress-theme-teek/es/components/theme/ThemeEnhance/src/LayoutDocWidthSlide.vue2.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var _sfc_main89 = defineComponent({
   ...{ name: "LayoutDocWidthSlide" },
   __name: "LayoutDocWidthSlide",
@@ -24452,6 +24655,7 @@ var _sfc_main89 = defineComponent({
 
 // node_modules/vitepress-theme-teek/es/components/theme/ThemeEnhance/src/ThemeColor.vue2.mjs
 import { useData as useData28 } from "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 
 // node_modules/vitepress-theme-teek/es/components/theme/ThemeEnhance/src/components/Switch.vue2.mjs
 var _sfc_main90 = defineComponent({
@@ -24473,15 +24677,15 @@ var _sfc_main90 = defineComponent({
           class: normalizeClass([unref(ns3).e("switch"), unref(ns3).is("checked", check.value)]),
           onClick: handleClick
         },
-        _cache[0] || (_cache[0] = [
+        [..._cache[0] || (_cache[0] = [
           createBaseVNode(
             "div",
             { class: "action" },
             null,
             -1
-            /* HOISTED */
+            /* CACHED */
           )
-        ]),
+        ])],
         2
         /* CLASS */
       );
@@ -24494,7 +24698,7 @@ var _hoisted_162 = { class: "flx-justify-between flx-1" };
 var _hoisted_246 = { class: "flx-align-center" };
 var _hoisted_331 = { class: "label" };
 var _hoisted_426 = ["title", "aria-label"];
-var _hoisted_516 = { class: "color-list flx-justify-between flx-wrap" };
+var _hoisted_517 = { class: "color-list flx-justify-between flx-wrap" };
 var _hoisted_614 = ["onClick", "title", "aria-label"];
 var _sfc_main91 = defineComponent({
   ...{ name: "ThemeColor" },
@@ -24609,7 +24813,7 @@ var _sfc_main91 = defineComponent({
                     title: item.tip,
                     "aria-label": item.label
                   }, toDisplayString(item.label), 9, _hoisted_426),
-                  createBaseVNode("ul", _hoisted_516, [
+                  createBaseVNode("ul", _hoisted_517, [
                     (openBlock(true), createElementBlock(
                       Fragment,
                       null,
@@ -24672,9 +24876,11 @@ var _sfc_main91 = defineComponent({
 
 // node_modules/vitepress-theme-teek/es/components/theme/ThemeEnhance/src/Spotlight.vue2.mjs
 import { useData as useData29 } from "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 
 // node_modules/vitepress-theme-teek/es/components/theme/ThemeEnhance/src/components/SpotlightHover.vue2.mjs
-import { useRoute as useRoute5 } from "vitepress";
+import { useRoute as useRoute6 } from "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var _sfc_main92 = defineComponent({
   ...{ name: "SpotlightHover" },
   __name: "SpotlightHover",
@@ -24757,7 +24963,7 @@ var _sfc_main92 = defineComponent({
     onMounted(() => {
       vpDocElement.value = document.querySelector(".VPDoc main .vp-doc");
     });
-    const route = useRoute5();
+    const route = useRoute6();
     watch(
       route,
       () => {
@@ -24890,6 +25096,7 @@ var _sfc_main93 = defineComponent({
 
 // node_modules/vitepress-theme-teek/es/components/theme/ThemeEnhance/src/SpotlightStyle.vue2.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var _sfc_main94 = defineComponent({
   ...{ name: "SpotlightStyle" },
   __name: "SpotlightStyle",
@@ -25043,6 +25250,7 @@ var _sfc_main95 = defineComponent({
 
 // node_modules/vitepress-theme-teek/es/components/common/VpContainer/src/index.vue2.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var _hoisted_163 = {
   key: 0,
   class: "custom-block-title"
@@ -25074,17 +25282,17 @@ var _sfc_main96 = defineComponent({
           createBaseVNode(
             "div",
             {
-              class: normalizeClass([_ctx.type, "custom-block", { "no-title": !_ctx.title }])
+              class: normalizeClass([__props.type, "custom-block", { "no-title": !__props.title }])
             },
             [
               hasTitle.value ? (openBlock(), createElementBlock("div", _hoisted_163, [
                 renderSlot(_ctx.$slots, "title", {}, () => [
-                  createBaseVNode("span", { innerHTML: _ctx.title }, null, 8, _hoisted_247)
+                  createBaseVNode("span", { innerHTML: __props.title }, null, 8, _hoisted_247)
                 ])
               ])) : createCommentVNode("v-if", true),
               hasText.value ? (openBlock(), createElementBlock("p", _hoisted_332, [
                 renderSlot(_ctx.$slots, "default", {}, () => [
-                  createBaseVNode("span", { innerHTML: _ctx.text }, null, 8, _hoisted_427)
+                  createBaseVNode("span", { innerHTML: __props.text }, null, 8, _hoisted_427)
                 ])
               ])) : createCommentVNode("v-if", true)
             ],
@@ -25101,6 +25309,7 @@ var _sfc_main96 = defineComponent({
 
 // node_modules/vitepress-theme-teek/es/components/theme/SidebarTrigger/src/index.vue2.mjs
 import "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var _hoisted_164 = ["title", "aria-label"];
 var _sfc_main97 = defineComponent({
   __name: "index",
@@ -25160,6 +25369,7 @@ var _sfc_main97 = defineComponent({
 
 // node_modules/vitepress-theme-teek/es/components/theme/HomeFeature/src/index.vue2.mjs
 import { withBase as withBase22 } from "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var _hoisted_165 = ["src"];
 var _hoisted_248 = ["innerHTML"];
 var _hoisted_333 = ["innerHTML"];
@@ -25167,7 +25377,7 @@ var _hoisted_428 = {
   key: 0,
   class: "features"
 };
-var _hoisted_517 = ["innerHTML"];
+var _hoisted_518 = ["innerHTML"];
 var _hoisted_615 = ["innerHTML"];
 var _hoisted_710 = ["src"];
 var _hoisted_87 = ["innerHTML"];
@@ -25185,7 +25395,7 @@ var _sfc_main98 = defineComponent({
     const { getTeekConfigRef } = useTeekConfig();
     const featuresConfig = getTeekConfigRef("features", []);
     const windowTransition = useWindowTransitionConfig((config) => config.feature);
-    const textInstance = useTemplateRef("textInstance");
+    const textInstance = ref(null);
     const { start } = useWindowTransition(textInstance, false);
     onMounted(() => {
       windowTransition.value && start();
@@ -25277,7 +25487,7 @@ var _sfc_main98 = defineComponent({
                                         }, null, 8, ["icon"])) : createCommentVNode("v-if", true),
                                         createBaseVNode("span", {
                                           innerHTML: item.title
-                                        }, null, 8, _hoisted_517)
+                                        }, null, 8, _hoisted_518)
                                       ],
                                       512
                                       /* NEED_PATCH */
@@ -25427,29 +25637,56 @@ var _sfc_main98 = defineComponent({
 });
 
 // node_modules/vitepress-theme-teek/es/components/theme/RouteLoading/src/index.vue.mjs
-import "vitepress";
+import { onContentUpdated as onContentUpdated2 } from "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
 var _sfc_main99 = {
   __name: "index",
+  props: {
+    "modelValue": { default: true },
+    "modelModifiers": {}
+  },
+  emits: ["update:modelValue"],
   setup(__props) {
-    const loading = ref(false);
+    const loading = useModel(__props, "modelValue");
     const ns4 = useNamespace("route-loading");
     const vpRouter = useVpRouter();
     const { getTeekConfigRef } = useTeekConfig();
-    const loadingConfig = getTeekConfigRef("loading", true);
-    vpRouter.bindBeforeRouteChange("routeLoadingBefore", () => {
-      handleRouteStart();
-    });
-    vpRouter.bindAfterRouteChange("routeLoadingAfter", () => {
-      handleRouteComplete();
-    });
-    const handleRouteStart = () => loading.value = true;
-    const handleRouteComplete = () => loading.value = false;
-    onBeforeMount(() => {
-      handleRouteStart();
-    });
-    onMounted(() => {
-      setTimeout(handleRouteComplete, 100);
-    });
+    const loadingConfig = getTeekConfigRef("loading", false);
+    const handleRouteStart = () => {
+      if (!loading.value) loading.value = true;
+    };
+    const handleRouteComplete = () => {
+      setTimeout(
+        () => {
+          if (loading.value) loading.value = false;
+        },
+        Math.floor(Math.random() * (500 - 460 + 1)) + 460
+      );
+    };
+    vpRouter.bindBeforeRouteChange(
+      "routeLoadingBefore",
+      () => {
+        handleRouteStart();
+      },
+      "before"
+    );
+    vpRouter.bindAfterRouteChange(
+      "routeLoadingAfter",
+      () => {
+        handleRouteComplete();
+      },
+      "before"
+    );
+    watch(
+      () => vpRouter.route.path,
+      () => {
+        handleRouteStart();
+        handleRouteComplete();
+      }
+    );
+    onBeforeMount(handleRouteStart);
+    onMounted(handleRouteComplete);
+    onContentUpdated2(handleRouteComplete);
     return (_ctx, _cache) => {
       return renderSlot(_ctx.$slots, "default", { loading: loading.value }, () => [
         createBaseVNode(
@@ -25458,44 +25695,54 @@ var _sfc_main99 = {
             class: normalizeClass(unref(ns4).b())
           },
           [
-            withDirectives(createBaseVNode(
-              "div",
-              {
-                class: normalizeClass(unref(ns4).e("mask"))
-              },
-              [
-                createBaseVNode(
+            createVNode(Transition, {
+              name: unref(ns4).join("fade"),
+              mode: "out-in",
+              persisted: ""
+            }, {
+              default: withCtx(() => [
+                withDirectives(createBaseVNode(
                   "div",
                   {
-                    class: normalizeClass(unref(ns4).e("loader"))
+                    class: normalizeClass(unref(ns4).e("mask"))
                   },
                   [
                     createBaseVNode(
                       "div",
                       {
-                        class: normalizeClass(unref(ns4).e("spinner"))
+                        class: normalizeClass(unref(ns4).e("loader"))
                       },
-                      null,
+                      [
+                        createBaseVNode(
+                          "div",
+                          {
+                            class: normalizeClass(unref(ns4).e("spinner"))
+                          },
+                          null,
+                          2
+                          /* CLASS */
+                        ),
+                        createBaseVNode(
+                          "p",
+                          null,
+                          toDisplayString(unref(isString2)(unref(loadingConfig)) ? unref(loadingConfig) : "Teek 拼命加载中 ..."),
+                          1
+                          /* TEXT */
+                        )
+                      ],
                       2
                       /* CLASS */
-                    ),
-                    createBaseVNode(
-                      "p",
-                      null,
-                      toDisplayString(unref(isString2)(unref(loadingConfig)) ? unref(loadingConfig) : "Teek 拼命加载中 ..."),
-                      1
-                      /* TEXT */
                     )
                   ],
                   2
                   /* CLASS */
-                )
-              ],
-              2
-              /* CLASS */
-            ), [
-              [vShow, loading.value]
-            ])
+                ), [
+                  [vShow, loading.value]
+                ])
+              ]),
+              _: 1
+              /* STABLE */
+            }, 8, ["name"])
           ],
           2
           /* CLASS */
@@ -25505,8 +25752,189 @@ var _sfc_main99 = {
   }
 };
 
-// node_modules/vitepress-theme-teek/es/components/theme/Layout/src/index.vue2.mjs
+// node_modules/vitepress-theme-teek/es/components/theme/ArticleBanner/src/index.vue2.mjs
+import { useData as useData30, useRoute as useRoute7, withBase as withBase23 } from "vitepress";
+import "E:/github/notes/node_modules/vitepress-theme-teek/theme-chalk/tk-copy-banner.css";
+var _hoisted_166 = ["src"];
+var _hoisted_249 = {
+  key: 0,
+  class: "categories flx-center"
+};
+var _hoisted_334 = ["href", "title"];
+var _hoisted_429 = {
+  key: 1,
+  class: "tags flx-center"
+};
+var _hoisted_519 = ["href", "title"];
 var _sfc_main100 = defineComponent({
+  __name: "index",
+  setup(__props) {
+    const loaded = ref(false);
+    const ns4 = useNamespace("article-banner");
+    const { frontmatter } = useData30();
+    const route = useRoute7();
+    const { hasSidebar } = useSidebar();
+    const { isMobile } = useCommon();
+    const { getTeekConfigRef } = useTeekConfig();
+    const articleBannerConfig = getTeekConfigRef("articleBanner", {
+      enabled: false,
+      showCategory: true,
+      showTag: true,
+      defaultCoverImg: "",
+      defaultCoverBgColor: ""
+    });
+    const postConfig = getTeekConfigRef("post", {
+      defaultCoverImg: []
+    });
+    const imgSrc = computed(() => {
+      const imgSrcList = [
+        frontmatter.value.coverImg || articleBannerConfig.value.defaultCoverImg || postConfig.value.defaultCoverImg || []
+      ].flat();
+      if (!imgSrcList.length) return "";
+      return imgSrcList[Math.floor(Math.random() * imgSrcList.length)];
+    });
+    const style = computed(() => {
+      return {
+        [ns4.cssVarName("article-banner-bg-color")]: frontmatter.value.coverBgColor || articleBannerConfig.value.defaultCoverBgColor
+      };
+    });
+    watch(
+      () => route.path,
+      async () => {
+        await nextTick();
+        loaded.value = true;
+        setTimeout(() => loaded.value = false, 1);
+      }
+    );
+    return (_ctx, _cache) => {
+      return !unref(hasSidebar) && unref(articleBannerConfig).enabled ? withDirectives((openBlock(), createElementBlock(
+        "div",
+        {
+          key: 0,
+          class: normalizeClass(unref(ns4).b()),
+          style: normalizeStyle(style.value)
+        },
+        [
+          createBaseVNode(
+            "div",
+            {
+              class: normalizeClass([unref(ns4).e("wrapper"), "flx-justify-center"])
+            },
+            [
+              imgSrc.value ? (openBlock(), createElementBlock(
+                "div",
+                {
+                  key: 0,
+                  class: normalizeClass(unref(ns4).e("cover"))
+                },
+                [
+                  createBaseVNode("img", {
+                    src: imgSrc.value,
+                    class: "no-preview",
+                    alt: "cover"
+                  }, null, 8, _hoisted_166)
+                ],
+                2
+                /* CLASS */
+              )) : createCommentVNode("v-if", true),
+              createBaseVNode(
+                "div",
+                {
+                  class: normalizeClass(unref(ns4).e("info"))
+                },
+                [
+                  renderSlot(_ctx.$slots, "teek-article-banner-info-top"),
+                  !unref(isMobile) ? (openBlock(), createBlock(unref(_sfc_main59), { key: 0 })) : createCommentVNode("v-if", true),
+                  createBaseVNode(
+                    "div",
+                    {
+                      class: normalizeClass([unref(ns4).e("meta"), "flx-center flx-wrap"])
+                    },
+                    [
+                      unref(frontmatter).categories && unref(articleBannerConfig).showCategory ? (openBlock(), createElementBlock("div", _hoisted_249, [
+                        (openBlock(true), createElementBlock(
+                          Fragment,
+                          null,
+                          renderList(unref(frontmatter).categories, (category) => {
+                            return openBlock(), createElementBlock("a", {
+                              key: category,
+                              href: unref(withBase23)(`/categories?category=${category}`),
+                              class: "meta-info category",
+                              title: category
+                            }, toDisplayString(category), 9, _hoisted_334);
+                          }),
+                          128
+                          /* KEYED_FRAGMENT */
+                        ))
+                      ])) : createCommentVNode("v-if", true),
+                      unref(frontmatter).tags && unref(articleBannerConfig).showTag ? (openBlock(), createElementBlock("div", _hoisted_429, [
+                        (openBlock(true), createElementBlock(
+                          Fragment,
+                          null,
+                          renderList(unref(frontmatter).tags, (tag) => {
+                            return openBlock(), createElementBlock("a", {
+                              key: tag,
+                              href: unref(withBase23)(`/tags?tag=${tag}`),
+                              class: "meta-info tag",
+                              title: tag
+                            }, [
+                              _cache[0] || (_cache[0] = createBaseVNode(
+                                "span",
+                                null,
+                                "#",
+                                -1
+                                /* CACHED */
+                              )),
+                              createBaseVNode(
+                                "span",
+                                null,
+                                toDisplayString(tag),
+                                1
+                                /* TEXT */
+                              )
+                            ], 8, _hoisted_519);
+                          }),
+                          128
+                          /* KEYED_FRAGMENT */
+                        ))
+                      ])) : createCommentVNode("v-if", true)
+                    ],
+                    2
+                    /* CLASS */
+                  ),
+                  createBaseVNode(
+                    "h1",
+                    null,
+                    toDisplayString(unref(frontmatter).title),
+                    1
+                    /* TEXT */
+                  ),
+                  createVNode(unref(_sfc_main60), {
+                    breadcrumb: false,
+                    scope: "article-banner"
+                  }),
+                  renderSlot(_ctx.$slots, "teek-article-banner-info-bottom")
+                ],
+                2
+                /* CLASS */
+              )
+            ],
+            2
+            /* CLASS */
+          ),
+          createVNode(unref(_sfc_main36))
+        ],
+        6
+        /* CLASS, STYLE */
+      )), [
+        [vShow, !loaded.value]
+      ]) : createCommentVNode("v-if", true);
+    };
+  }
+});
+
+// node_modules/vitepress-theme-teek/es/components/theme/Layout/src/index.vue2.mjs
+var _sfc_main101 = defineComponent({
   ...{ name: "TeekLayout" },
   __name: "index",
   props: {
@@ -25522,14 +25950,15 @@ var _sfc_main100 = defineComponent({
     const ns4 = useNamespace("layout");
     const { getTeekConfigRef } = useTeekConfig();
     const { isHomePage, isArchivesPage, isCataloguePage, isArticleOverviewPage } = usePageState();
-    const { frontmatter, localeIndex, page } = useData30();
+    const { frontmatter, localeIndex, page } = useData31();
+    const { hasSidebar } = useSidebar();
     const teekConfig = getTeekConfigRef(null, {
       teekTheme: true,
       teekHome: true,
       vpHome: true,
       sidebarTrigger: false,
       loading: false,
-      codeBlock: { disabled: false },
+      codeBlock: { enabled: true },
       themeSize: "",
       bodyBgImg: {},
       notice: {},
@@ -25540,8 +25969,11 @@ var _sfc_main100 = defineComponent({
       articleShare: {},
       appreciation: {},
       riskLink: { enabled: false },
-      themeEnhance: { enabled: true }
+      themeEnhance: { enabled: true },
+      articleBanner: { enabled: false },
+      pageStyle: "default"
     });
+    const loading = ref(teekConfig.value.loading);
     const commentConfig = computed(() => {
       const comment = frontmatter.value.comment ?? teekConfig.value.comment;
       if (isBoolean(comment)) return { enabled: comment };
@@ -25567,6 +25999,9 @@ var _sfc_main100 = defineComponent({
       if (isBoolean(teekConfig.value.articleBottomTip)) return teekConfig.value.articleBottomTip;
       return (_b = (_a = teekConfig.value).articleBottomTip) == null ? void 0 : _b.call(_a, frontmatter.value, localeIndex.value, page.value);
     });
+    const showArticleBanner = computed(
+      () => frontmatter.value.articleBanner !== false && teekConfig.value.articleBanner.enabled && !hasSidebar.value && frontmatter.value.article !== false && (!frontmatter.value.layout || frontmatter.value.layout === "doc") && teekConfig.value.pageStyle === "default"
+    );
     const themeSizeAttribute = ns4.join("theme-size");
     watch(
       () => teekConfig.value.themeSize,
@@ -25584,13 +26019,14 @@ var _sfc_main100 = defineComponent({
     });
     watchSite();
     watchPages();
-    onContentUpdated2(() => {
+    onContentUpdated3(() => {
       if (teekConfig.value.riskLink.enabled) restart();
     });
     const usedSlots = [
       "home-hero-before",
       "home-features-after",
       "nav-bar-content-after",
+      "layout-top",
       "layout-bottom",
       "doc-footer-before",
       "doc-before",
@@ -25606,15 +26042,42 @@ var _sfc_main100 = defineComponent({
         Fragment,
         { key: 0 },
         [
-          unref(frontmatter).loginPage === true ? renderSlot(_ctx.$slots, "teek-login-page", { key: 0 }, () => [
-            createVNode(unref(_sfc_main17))
+          unref(teekConfig).loading ?? false ? (openBlock(), createBlock(unref(_sfc_main99), {
+            key: 0,
+            modelValue: loading.value,
+            "onUpdate:modelValue": _cache[0] || (_cache[0] = ($event) => loading.value = $event)
+          }, {
+            default: withCtx((scope) => [
+              renderSlot(_ctx.$slots, "teek-loading", normalizeProps(guardReactiveProps(scope)))
+            ]),
+            _: 3
+            /* FORWARDED */
+          }, 8, ["modelValue"])) : createCommentVNode("v-if", true),
+          unref(frontmatter).loginPage === true ? renderSlot(_ctx.$slots, "teek-login-page", { key: 1 }, () => [
+            withDirectives(createVNode(
+              unref(_sfc_main17),
+              null,
+              null,
+              512
+              /* NEED_PATCH */
+            ), [
+              [vShow, !loading.value]
+            ])
           ]) : createCommentVNode("v-if", true),
-          unref(frontmatter).riskLinkPage === true ? renderSlot(_ctx.$slots, "teek-risk-link-page", { key: 1 }, () => [
-            createVNode(unref(_sfc_main18))
+          unref(frontmatter).riskLinkPage === true ? renderSlot(_ctx.$slots, "teek-risk-link-page", { key: 2 }, () => [
+            withDirectives(createVNode(
+              unref(_sfc_main18),
+              null,
+              null,
+              512
+              /* NEED_PATCH */
+            ), [
+              [vShow, !loading.value]
+            ])
           ]) : createCommentVNode("v-if", true),
           unref(frontmatter).layout !== false ? (openBlock(), createElementBlock(
             Fragment,
-            { key: 2 },
+            { key: 3 },
             [
               ((_a = unref(teekConfig).bodyBgImg) == null ? void 0 : _a.imgSrc) ? (openBlock(), createBlock(unref(_sfc_main50), { key: 0 })) : createCommentVNode("v-if", true),
               createVNode(unref(_sfc_main63)),
@@ -25655,19 +26118,12 @@ var _sfc_main100 = defineComponent({
                 ]),
                 1024
                 /* DYNAMIC_SLOTS */
-              ),
-              unref(teekConfig).loading ?? false ? (openBlock(), createBlock(unref(_sfc_main99), { key: 2 }, {
-                default: withCtx((scope) => [
-                  renderSlot(_ctx.$slots, "teek-loading", normalizeProps(guardReactiveProps(scope)))
-                ]),
-                _: 3
-                /* FORWARDED */
-              })) : createCommentVNode("v-if", true)
+              )
             ],
             64
             /* STABLE_FRAGMENT */
           )) : createCommentVNode("v-if", true),
-          createVNode(unref(Layout), {
+          withDirectives(createVNode(unref(Layout), {
             class: normalizeClass([
               unref(ns4).b(),
               { [unref(ns4).m("hide-vp-home")]: !unref(teekConfig).vpHome },
@@ -25735,33 +26191,76 @@ var _sfc_main100 = defineComponent({
                 /* DYNAMIC_SLOTS */
               )) : createCommentVNode("v-if", true)
             ]),
+            "layout-top": withCtx(() => [
+              renderSlot(_ctx.$slots, "layout-top"),
+              showArticleBanner.value ? (openBlock(), createElementBlock(
+                Fragment,
+                { key: 0 },
+                [
+                  renderSlot(_ctx.$slots, "teek-article-banner-before"),
+                  createVNode(
+                    unref(_sfc_main100),
+                    null,
+                    createSlots({
+                      _: 2
+                      /* DYNAMIC */
+                    }, [
+                      renderList(_ctx.$slots, (_, name) => {
+                        return {
+                          name,
+                          fn: withCtx((scope) => [
+                            renderSlot(_ctx.$slots, name, normalizeProps(guardReactiveProps(scope)))
+                          ])
+                        };
+                      })
+                    ]),
+                    1024
+                    /* DYNAMIC_SLOTS */
+                  ),
+                  renderSlot(_ctx.$slots, "teek-article-banner-after")
+                ],
+                64
+                /* STABLE_FRAGMENT */
+              )) : createCommentVNode("v-if", true)
+            ]),
             "layout-bottom": withCtx(() => [
-              unref(isHomePage) ? (openBlock(), createBlock(unref(_sfc_main51), { key: 0 })) : createCommentVNode("v-if", true),
-              renderSlot(_ctx.$slots, "teek-footer-info-before"),
-              unref(isHomePage) ? (openBlock(), createBlock(unref(_sfc_main52), { key: 1 })) : createCommentVNode("v-if", true),
-              renderSlot(_ctx.$slots, "teek-footer-info-after"),
+              unref(isHomePage) ? (openBlock(), createElementBlock(
+                Fragment,
+                { key: 0 },
+                [
+                  renderSlot(_ctx.$slots, "teek-footer-group-before"),
+                  createVNode(unref(_sfc_main51)),
+                  renderSlot(_ctx.$slots, "teek-footer-group-after"),
+                  renderSlot(_ctx.$slots, "teek-footer-info-before"),
+                  renderSlot(_ctx.$slots, "teek-footer-info", {}, () => [
+                    createVNode(unref(_sfc_main52))
+                  ]),
+                  renderSlot(_ctx.$slots, "teek-footer-info-after")
+                ],
+                64
+                /* STABLE_FRAGMENT */
+              )) : createCommentVNode("v-if", true),
               renderSlot(_ctx.$slots, "layout-bottom")
             ]),
             "sidebar-nav-before": withCtx(() => [
               createVNode(unref(_sfc_main49))
             ]),
-            "doc-footer-before": withCtx(() => [
-              bottomTipConfig.value ? (openBlock(), createBlock(
-                unref(_sfc_main96),
-                normalizeProps(mergeProps({ key: 0 }, unref(isBoolean)(bottomTipConfig.value) ? {} : bottomTipConfig.value)),
-                null,
-                16
-                /* FULL_PROPS */
-              )) : createCommentVNode("v-if", true)
-            ]),
             "doc-before": withCtx(() => [
               renderSlot(_ctx.$slots, "doc-before"),
-              renderSlot(_ctx.$slots, "teek-article-analyze-before"),
-              unref(frontmatter).article !== false ? (openBlock(), createBlock(unref(_sfc_main60), { key: 0 })) : createCommentVNode("v-if", true),
-              renderSlot(_ctx.$slots, "teek-article-analyze-after"),
+              unref(frontmatter).article !== false && !showArticleBanner.value ? (openBlock(), createElementBlock(
+                Fragment,
+                { key: 0 },
+                [
+                  renderSlot(_ctx.$slots, "teek-article-analyze-before"),
+                  createVNode(unref(_sfc_main60)),
+                  renderSlot(_ctx.$slots, "teek-article-analyze-after")
+                ],
+                64
+                /* STABLE_FRAGMENT */
+              )) : createCommentVNode("v-if", true),
               createVNode(unref(_sfc_main56)),
               createVNode(unref(_sfc_main64)),
-              !unref(teekConfig).codeBlock.disabled ? (openBlock(), createBlock(unref(_sfc_main74), { key: 1 })) : createCommentVNode("v-if", true),
+              unref(teekConfig).codeBlock.enabled ?? true ? (openBlock(), createBlock(unref(_sfc_main74), { key: 1 })) : createCommentVNode("v-if", true),
               topTipConfig.value ? (openBlock(), createBlock(
                 unref(_sfc_main96),
                 normalizeProps(mergeProps({ key: 2 }, unref(isBoolean)(topTipConfig.value) ? {} : topTipConfig.value)),
@@ -25777,88 +26276,146 @@ var _sfc_main100 = defineComponent({
                 /* FORWARDED */
               })) : createCommentVNode("v-if", true)
             ]),
+            "doc-footer-before": withCtx(() => [
+              renderSlot(_ctx.$slots, "doc-footer-before"),
+              bottomTipConfig.value ? (openBlock(), createElementBlock(
+                Fragment,
+                { key: 0 },
+                [
+                  renderSlot(_ctx.$slots, "teek-article-bottom-tip-before"),
+                  createVNode(
+                    unref(_sfc_main96),
+                    normalizeProps(guardReactiveProps(unref(isBoolean)(bottomTipConfig.value) ? {} : bottomTipConfig.value)),
+                    null,
+                    16
+                    /* FULL_PROPS */
+                  ),
+                  renderSlot(_ctx.$slots, "teek-article-bottom-tip-after")
+                ],
+                64
+                /* STABLE_FRAGMENT */
+              )) : createCommentVNode("v-if", true)
+            ]),
             "doc-after": withCtx(() => {
               var _a2;
               return [
                 renderSlot(_ctx.$slots, "doc-after"),
-                renderSlot(_ctx.$slots, "teek-doc-update-before"),
-                (unref(teekConfig).articleUpdate.enabled ?? true) && unref(frontmatter).articleUpdate !== false ? (openBlock(), createBlock(unref(_sfc_main62), { key: 0 })) : createCommentVNode("v-if", true),
-                renderSlot(_ctx.$slots, "teek-doc-update-after"),
-                renderSlot(_ctx.$slots, "teek-doc-after-appreciation-before"),
-                unref(teekConfig).appreciation.position === "doc-after" ? (openBlock(), createBlock(unref(_sfc_main66), { key: 1 })) : unref(teekConfig).appreciation.position === "doc-after-popper" ? (openBlock(), createBlock(unref(_sfc_main68), { key: 2 })) : createCommentVNode("v-if", true),
-                renderSlot(_ctx.$slots, "teek-doc-after-appreciation-after"),
-                renderSlot(_ctx.$slots, "teek-comment-before"),
-                createCommentVNode(" 评论区 "),
-                commentConfig.value.enabled && commentConfig.value.provider ? (openBlock(), createElementBlock(
+                (unref(teekConfig).articleUpdate.enabled ?? true) && unref(frontmatter).articleUpdate !== false ? (openBlock(), createElementBlock(
                   Fragment,
-                  { key: 3 },
+                  { key: 0 },
                   [
-                    commentConfig.value.provider === "render" ? renderSlot(_ctx.$slots, "teek-comment", { key: 0 }) : (openBlock(), createBlock(resolveDynamicComponent((_a2 = commentConfig.value.components) == null ? void 0 : _a2[commentConfig.value.provider]), {
-                      key: 1,
-                      id: `${unref(ns4).namespace}-comment`,
-                      class: normalizeClass(unref(ns4).e("comment"))
-                    }, null, 8, ["id", "class"]))
+                    renderSlot(_ctx.$slots, "teek-doc-update-before"),
+                    createVNode(unref(_sfc_main62)),
+                    renderSlot(_ctx.$slots, "teek-doc-update-after")
                   ],
                   64
                   /* STABLE_FRAGMENT */
                 )) : createCommentVNode("v-if", true),
-                renderSlot(_ctx.$slots, "teek-comment-after")
+                ["doc-after", "doc-after-popper"].includes(unref(teekConfig).appreciation.position) ? (openBlock(), createElementBlock(
+                  Fragment,
+                  { key: 1 },
+                  [
+                    renderSlot(_ctx.$slots, "teek-doc-after-appreciation-before"),
+                    unref(teekConfig).appreciation.position === "doc-after" ? (openBlock(), createBlock(unref(_sfc_main66), { key: 0 })) : unref(teekConfig).appreciation.position === "doc-after-popper" ? (openBlock(), createBlock(unref(_sfc_main68), { key: 1 })) : createCommentVNode("v-if", true),
+                    renderSlot(_ctx.$slots, "teek-doc-after-appreciation-after")
+                  ],
+                  64
+                  /* STABLE_FRAGMENT */
+                )) : createCommentVNode("v-if", true),
+                createCommentVNode(" 评论区 "),
+                commentConfig.value.enabled && commentConfig.value.provider ? (openBlock(), createElementBlock(
+                  Fragment,
+                  { key: 2 },
+                  [
+                    renderSlot(_ctx.$slots, "teek-comment-before"),
+                    commentConfig.value.provider === "render" ? renderSlot(_ctx.$slots, "teek-comment", { key: 0 }) : (openBlock(), createBlock(resolveDynamicComponent((_a2 = commentConfig.value.components) == null ? void 0 : _a2[commentConfig.value.provider]), {
+                      key: 1,
+                      id: `${unref(ns4).namespace}-comment`,
+                      class: normalizeClass(unref(ns4).e("comment"))
+                    }, null, 8, ["id", "class"])),
+                    renderSlot(_ctx.$slots, "teek-comment-after")
+                  ],
+                  64
+                  /* STABLE_FRAGMENT */
+                )) : createCommentVNode("v-if", true)
               ];
             }),
             "aside-bottom": withCtx(() => [
               renderSlot(_ctx.$slots, "aside-bottom"),
-              renderSlot(_ctx.$slots, "teek-aside-bottom-appreciation-before"),
-              unref(teekConfig).appreciation.position === "aside-bottom" ? (openBlock(), createBlock(unref(_sfc_main65), { key: 0 })) : createCommentVNode("v-if", true),
-              renderSlot(_ctx.$slots, "teek-aside-bottom-appreciation-after")
+              unref(teekConfig).appreciation.position === "aside-bottom" ? (openBlock(), createElementBlock(
+                Fragment,
+                { key: 0 },
+                [
+                  renderSlot(_ctx.$slots, "teek-aside-bottom-appreciation-before"),
+                  createVNode(unref(_sfc_main65)),
+                  renderSlot(_ctx.$slots, "teek-aside-bottom-appreciation-after")
+                ],
+                64
+                /* STABLE_FRAGMENT */
+              )) : createCommentVNode("v-if", true)
             ]),
             "page-top": withCtx(() => [
               renderSlot(_ctx.$slots, "page-top"),
-              renderSlot(_ctx.$slots, "teek-page-top-before"),
-              unref(isArchivesPage) ? (openBlock(), createBlock(
-                unref(_sfc_main8),
+              unref(isArchivesPage) || unref(isCataloguePage) || unref(isArticleOverviewPage) ? (openBlock(), createElementBlock(
+                Fragment,
                 { key: 0 },
-                createSlots({
-                  _: 2
-                  /* DYNAMIC */
-                }, [
-                  renderList(_ctx.$slots, (_, name) => {
-                    return {
-                      name,
-                      fn: withCtx((scope) => [
-                        renderSlot(_ctx.$slots, name, normalizeProps(guardReactiveProps(scope)))
-                      ])
-                    };
-                  })
-                ]),
-                1024
-                /* DYNAMIC_SLOTS */
-              )) : createCommentVNode("v-if", true),
-              unref(isCataloguePage) ? (openBlock(), createBlock(
-                unref(_sfc_main6),
-                { key: 1 },
-                createSlots({
-                  _: 2
-                  /* DYNAMIC */
-                }, [
-                  renderList(_ctx.$slots, (_, name) => {
-                    return {
-                      name,
-                      fn: withCtx((scope) => [
-                        renderSlot(_ctx.$slots, name, normalizeProps(guardReactiveProps(scope)))
-                      ])
-                    };
-                  })
-                ]),
-                1024
-                /* DYNAMIC_SLOTS */
-              )) : createCommentVNode("v-if", true),
-              unref(isArticleOverviewPage) ? (openBlock(), createBlock(unref(_sfc_main9), { key: 2 })) : createCommentVNode("v-if", true),
-              renderSlot(_ctx.$slots, "teek-page-top-after")
+                [
+                  renderSlot(_ctx.$slots, "teek-page-top-before"),
+                  unref(isArchivesPage) ? (openBlock(), createBlock(
+                    unref(_sfc_main8),
+                    { key: 0 },
+                    createSlots({
+                      _: 2
+                      /* DYNAMIC */
+                    }, [
+                      renderList(_ctx.$slots, (_, name) => {
+                        return {
+                          name,
+                          fn: withCtx((scope) => [
+                            renderSlot(_ctx.$slots, name, normalizeProps(guardReactiveProps(scope)))
+                          ])
+                        };
+                      })
+                    ]),
+                    1024
+                    /* DYNAMIC_SLOTS */
+                  )) : unref(isCataloguePage) ? (openBlock(), createBlock(
+                    unref(_sfc_main6),
+                    { key: 1 },
+                    createSlots({
+                      _: 2
+                      /* DYNAMIC */
+                    }, [
+                      renderList(_ctx.$slots, (_, name) => {
+                        return {
+                          name,
+                          fn: withCtx((scope) => [
+                            renderSlot(_ctx.$slots, name, normalizeProps(guardReactiveProps(scope)))
+                          ])
+                        };
+                      })
+                    ]),
+                    1024
+                    /* DYNAMIC_SLOTS */
+                  )) : unref(isArticleOverviewPage) ? (openBlock(), createBlock(unref(_sfc_main9), { key: 2 })) : createCommentVNode("v-if", true),
+                  renderSlot(_ctx.$slots, "teek-page-top-after")
+                ],
+                64
+                /* STABLE_FRAGMENT */
+              )) : createCommentVNode("v-if", true)
             ]),
             "aside-outline-before": withCtx(() => [
-              renderSlot(_ctx.$slots, "teek-article-share-before"),
-              unref(teekConfig).articleShare.enabled ? (openBlock(), createBlock(unref(_sfc_main61), { key: 0 })) : createCommentVNode("v-if", true),
-              renderSlot(_ctx.$slots, "teek-article-share-after"),
+              unref(teekConfig).articleShare.enabled ? (openBlock(), createElementBlock(
+                Fragment,
+                { key: 0 },
+                [
+                  renderSlot(_ctx.$slots, "teek-article-share-before"),
+                  createVNode(unref(_sfc_main61)),
+                  renderSlot(_ctx.$slots, "teek-article-share-after")
+                ],
+                64
+                /* STABLE_FRAGMENT */
+              )) : createCommentVNode("v-if", true),
               renderSlot(_ctx.$slots, "aside-outline-before")
             ]),
             _: 2
@@ -25872,7 +26429,9 @@ var _sfc_main100 = defineComponent({
                 ])
               };
             })
-          ]), 1032, ["class"])
+          ]), 1032, ["class"]), [
+            [vShow, !loading.value]
+          ])
         ],
         64
         /* STABLE_FRAGMENT */
@@ -25902,7 +26461,7 @@ var _sfc_main100 = defineComponent({
 // node_modules/vitepress-theme-teek/es/index.mjs
 var index = {
   extends: DefaultTheme2,
-  Layout: TeekConfigProvider(_sfc_main100),
+  Layout: TeekConfigProvider(_sfc_main101),
   async enhanceApp({ app, siteData, router }) {
     app.component("TkCataloguePage", _sfc_main6);
     app.component("TkArchivesPage", _sfc_main8);
@@ -26005,7 +26564,7 @@ export {
   _sfc_main14 as TkIcon,
   _sfc_main55 as TkImageViewer,
   _sfc_main87 as TkInputSlide,
-  _sfc_main100 as TkLayout,
+  _sfc_main101 as TkLayout,
   _sfc_main17 as TkLoginPage,
   message as TkMessage,
   _sfc_main79 as TkNotice,
@@ -26183,12 +26742,14 @@ export {
   touchMedia,
   trackPageview,
   transitionName,
+  twikooContext,
   umamiAnalytics,
   upperFirst,
   useAllPosts,
   useAnchorScroll,
   useClipboard,
   useCommon,
+  useCopyBanner,
   useDebounce,
   useElementHover,
   useEventListener,
@@ -26204,6 +26765,7 @@ export {
   useRiskLink,
   useScopeDispose,
   useScrollData,
+  useSidebar,
   useStorage,
   useSwitchData,
   useTagColor,

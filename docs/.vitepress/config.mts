@@ -190,22 +190,21 @@ export default defineConfig({
 				],
 			},
 			{
-				text: "后端",
+				text: "八股",
 				items: [
 					{
 						text: "Java面试",
-						link: "/interview/01.Java基础/01.Java基础概念",
+						link: "/java/01.Java基础/01.Java基础概念",
 					},
 					{
-						text: "更新日志",
-						link: "https://github.com/Kele-Bingtang/vitepress-theme-teek/blob/dev/CHANGELOG.md",
+						text: "中间件",
+						link: "/middleware/01.%20RocketMQ/01.RocketMQ%E5%9F%BA%E7%A1%80.html",
+					},
+					{
+						text: "Mysql",
+						link: "/mysql/01.MySQL/01.MySQL%E5%9F%BA%E7%A1%80.html",
 					},
 				],
-			},
-			{
-				text: "java",
-				link: "/02.Java/01.基础部分/01.Java基础知识介绍",
-				activeMatch: "/01.指南/",
 			},
 		],
 		socialLinks: [

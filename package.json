@@ -1,7 +1,7 @@
 {
 	"devDependencies": {
 		"vitepress": "^1.6.4",
-		"vitepress-theme-teek": "^1.4.4"
+		"vitepress-theme-teek": "^1.5.1"
 	},
 	"scripts": {
 		"docs:dev": "vitepress dev docs",
