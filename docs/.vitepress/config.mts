@@ -204,6 +204,10 @@ export default defineConfig({
 						text: "Mysql",
 						link: "/mysql/01.MySQL%E5%9F%BA%E7%A1%80.html",
 					},
+					{
+						text: "Redis",
+						link: "/redis/01.Redis基础.html",
+					},
 				],
 			},
 		],
