@@ -180,7 +180,7 @@ export default defineConfig({
 				text: "前端",
 				items: [
 					{
-						text: "前端基础",
+						text: "前端",
 						link: "/front/01.html/01.排版标签.html",
 					},
 					{
