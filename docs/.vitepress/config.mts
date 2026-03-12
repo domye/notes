@@ -208,6 +208,10 @@ export default defineConfig({
 						text: "Redis",
 						link: "/redis/01.Redis基础.html",
 					},
+					{
+						text: "计算机网络",
+						link: "/computerNetwork/01.计算机网络基础.html",
+					},
 				],
 			},
 		],
